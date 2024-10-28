@@ -25,7 +25,8 @@ test/
 
 VAR1=os.getenv('VAR1','Quadratic cost function')
 #VAR2=os.getenv('VAR2','Gradient reduction')
-VAR2=os.getenv('VAR2','Norm reduction')
+#VAR2=os.getenv('VAR2','Norm reduction')
+VAR2=os.getenv('VAR2','Residual norm')
 file_name = 'costgrad.txt'  # output from grep and paste command
 
 def integers(a, b):
@@ -90,7 +91,7 @@ def plot_in_one_figure(forx, cost, costJb, costJoJc, grad, iters):
     ax1.set_xlabel('Iterations',fontsize=12)
     ax1.set_xticks(forx[::10])
     ax1.set_xticklabels(iters.astype(np.int32)[::10]) #,rotation=45)
-    ax1.set_ylabel('cost function',fontsize=12)
+    ax1.set_ylabel('Cost Function',fontsize=12)
     plt.plot(forx,cost,'r.-', label='J')
     plt.plot(forx,costJb,'b.-', label='Jb')
     plt.plot(forx,costJoJc,'k.-', label='Jo')
@@ -98,7 +99,7 @@ def plot_in_one_figure(forx, cost, costJb, costJoJc, grad, iters):
     ax1.legend()
 
     ax2 = ax1.twinx()
-    ax2.set_ylabel('gradient norm reduction',fontsize=16)
+    ax2.set_ylabel('Gradient Norm',fontsize=12)
     ax2.plot(forx, grad, 'r.:', label='grad')
     #ax2.legend()
 
@@ -109,10 +110,10 @@ def plot_in_one_figure(forx, cost, costJb, costJoJc, grad, iters):
 def plot(forx,value,iters,VAR,name): 
     fig, ax1 = plt.subplots()
 
-    ax1.set_xlabel('Iterations',fontsize=16)
+    ax1.set_xlabel('Iterations',fontsize=12)
     ax1.set_xticks(forx[::2])
     ax1.set_xticklabels(iters.astype(np.int32)[::2]) #,rotation=45)
-    ax1.set_ylabel('%s'%VAR,fontsize=16)
+    ax1.set_ylabel('%s'%VAR,fontsize=12)
     plt.plot(forx,value,'r.-')
     plt.ticklabel_format(style='sci', axis='y', scilimits=(0,4))
     plt.grid(True)
