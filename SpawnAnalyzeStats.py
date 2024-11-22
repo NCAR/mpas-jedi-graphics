@@ -121,6 +121,7 @@ def main():
     if args.account: jobConf['account'] = args.account
     if args.queue: jobConf['queue'] = args.queue
     if args.memory: jobConf['memory'] = args.memory
+    if args.nppernode: jobConf['nppernode'] = args.nppernode
 
     jobConf['env'] = jobenv
 
@@ -134,7 +135,8 @@ def main():
         npwork = grpAtt['npwork']
         myJobConf['nnode'] = npwork
         npread = grpAtt['npread']
-        myJobConf['nppernode'] = max(npwork, npread)
+        if 'nppernode' not in jobConf:
+          myJobConf['nppernode'] = max(npwork, npread)
         myJobConf['walltime'] = grpAtt['analyze walltime']
 
         myJobConf['name'] = 'AnStat_'+DiagSpace+'_'+analysisType

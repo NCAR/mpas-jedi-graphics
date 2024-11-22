@@ -20,7 +20,7 @@ class ProcessArgs:
     The main program should explicitly import the Args class it needs.
     '''
     if ProcessArgs.parser is None:
-      ProcessArgs.parser = argparse.ArgumentParser()
+      ProcessArgs.parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
       for processor in self.argProcessors:
         processor.add_arguments(self.parser)
 

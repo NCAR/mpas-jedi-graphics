@@ -95,29 +95,30 @@ class PBSProDerecho(JobScriptBase):
     unique config elements compared to base class:
         account - derecho account for charging
         queue   - name of job submission queue (see qavail)
-        memory  - amount of memory requested per node (see mavail)
+        memory  - amount of memory requested per node (see maxmemory)
 
     NOTE: Derecho has a maximum of 128 processors available per node
     '''
-    qavail = ['main']
-    mavail = [235]
+    qavail = ['main@desched1', 'develop@desched1']
+    maxmemory = 256
     maxnppernode = 128
     def __init__(self, conf):
         # Initialize derived config settings
         super().__init__(conf)
 
         # Initialize config settings that are specific to PBSProDerecho
-        self.account = conf.get('account','NMMM0043')
+        self.account = conf.get('account','NMMM0015')
         self.queue = conf.get('queue','main')
         assert self.queue in self.qavail, ("ERROR: PBSProDerecho requires queue to be any of ",self.qavail)
         self.memory = conf.get('memory',235)
-        assert self.memory in self.mavail, ("ERROR: PBSProDerecho requires memory (in GB) to be any  of", self.mavail)
+        assert self.memory <= self.maxmemory, ("ERROR: PBSProDerecho requires memory (in GB) to be <= ", self.maxmemory)
         assert self.nppernode <= self.maxnppernode, ("ERROR: PBSProDerecho requires nppernode <= ", self.maxnppernode)
 
         self.header = [
             '#PBS -N '+self.jobname,
             '#PBS -A '+self.account,
             '#PBS -q '+self.queue,
+            '#PBS -l job_priority=regular'
             '#PBS -l select='+str(self.nnode)+':ncpus='+str(self.nppernode)+':mpiprocs='+str(self.nppernode)+':mem='+str(self.memory)+'GB',
             '#PBS -l walltime='+self.walltime,
             '#PBS -m ae',
@@ -147,7 +148,7 @@ class PBSProCheyenne(JobScriptBase):
         super().__init__(conf)
 
         # Initialize config settings that are specific to PBSProCheyenne
-        self.account = conf.get('account','NMMM0043')
+        self.account = conf.get('account','NMMM0015')
         self.queue = conf.get('queue','regular')
         assert self.queue in self.qavail, ("ERROR: PBSProCheyenne requires queue to be any of ",self.qavail)
         self.memory = conf.get('memory',109)
@@ -219,7 +220,8 @@ class PBSProCasper(JobScriptBase):
 
     NOTE: 96 of the 104 Casper compute nodes only have 36 processors. 8 GPU nodes have 128 processors.
     '''
-    qavail = ['casper', 'gpudev'] # 'casper' queue is the default submission queue
+    # casper queue feeds the htc and largemem (cpu nodes) and vis (gpu nodes) queues.
+    qavail = ['casper@casper-pbs']
     maxnppernode = 36
     maxmemory = 360
     def __init__(self, conf):
@@ -229,21 +231,14 @@ class PBSProCasper(JobScriptBase):
         # Initialize config settings that are specific to PBSProCasper
         self.account = conf.get('account','NMMM0015')
         self.queue = conf.get('queue','casper')
+        gpus = conf.get('gpus', '') # assume this is '' or ':ngpus=1', to be added to -l select spec
         assert self.queue in self.qavail, ("ERROR: PBSProCasper requires queue to be any of ",self.qavail)
-        # to use devices with gpus, use the 'casper' queue but specify ngpus in the select statement
-        if self.queue == 'gpudev':
-          self.queue = 'casper'
-          gpus = ':ngpus=1'
-        else:
-          gpus = ""
 
         self.memory = conf.get('memory',109)
         assert self.memory <= self.maxmemory, ("ERROR: PBSProCasper requires memory (in GB) to be <= ", self.maxmemory)
+        # ensure number of cpu's per node doesn't exceed the max
         if self.nppernode > self.maxnppernode:
-          print("WARNING: PBSProCasper requires nppernode <= ", self.maxnppernode)
-          print(" changing nppernode from ", self.nppernode, " to ", self.maxnppernode)
           self.nppernode = self.maxnppernode
-        assert self.nppernode <= self.maxnppernode, ("ERROR: PBSProCasper requires nppernode <= ", self.maxnppernode)
 
         self.header = [
             '#PBS -N '+self.jobname,
@@ -273,14 +268,35 @@ JobScriptDict = {
     'casper': PBSProCasper
 }
 
+# default queues for derecho and casper
+DefaultQueueDict = {
+    'derecho': 'develop',
+    'casper': 'casper'
+}
+
 
 def JobScriptFactory(conf):
-    ## get system name
-    conf['sysname'] = subprocess.run(['uname','-n'],
-                      stdout=subprocess.PIPE).stdout.decode('utf-8')
+    ## get root system name w/o login node specifics, e.g. 'derecho' or 'casper'
+    conf['sysname'] = os.getenv('NCAR_HOST')
+    ## get the default queue for the system this is running on.
+    queue = conf.get('queue', DefaultQueueDict[conf['sysname']])
 
-    ## match system name with JobScriptDict or return base class object by default
-    for key, jobclass in JobScriptDict.items():
-        if key in conf['sysname']:
-            return jobclass(conf)
-    return JobScriptBase(conf)
+    ## modify target system based on requested queue,
+    ## and use system qualified queue names.
+    ## this allows submitting jobs from casper to derecho and vice versa.
+    if queue == 'gpudev' or queue == 'casper':
+      conf['sysname'] = 'casper'
+      conf['queue'] = 'casper@casper-pbs'
+      ## adding :ngpus=1 to the PBS -l select spec will use the visualization queue on casper
+      if queue == 'gpudev':
+        conf['gpus'] = ':ngpus=1'
+    elif queue == 'main' or queue == 'develop':
+      conf['sysname'] = 'derecho'
+      conf['queue'] = queue + '@desched1'
+
+    ## get the job script object for the system name or return base class object by default
+    jobclass = JobScriptDict[conf['sysname']]
+    if jobclass is not None:
+      return jobclass(conf)
+    else:
+      return JobScriptBase(conf)
