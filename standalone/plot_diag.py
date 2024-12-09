@@ -8,6 +8,7 @@ matplotlib.use('AGG')
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib.axes as maxes
+from matplotlib.ticker import MaxNLocator
 import fnmatch
 import math
 import basic_plot_functions
@@ -138,6 +139,7 @@ def readdata():
   longitude = metaGroup+'/longitude'
   pressure = metaGroup+'/pressure'
   altitude = metaGroup+'/height'
+  Channel = "Channel"
   occultID = metaGroup+'/occulting_sat_is'
   satelliteId = metaGroup+'/satelliteIdentifier'
   stationID = metaGroup+'/stationIdentification'
@@ -147,6 +149,7 @@ def readdata():
   binningCoordinates = {
     altitude: {'varName': 'Altitude (m)'},
     pressure: {'varName': 'Pressure (hPa)'},
+    Channel:  {'varName': 'Channel'},
   }
   binningCoordinates[altitude]['edges'] = np.arange(50000.0, -1000., -2000.)
   binningCoordinates[pressure]['edges'] = \
@@ -290,6 +293,8 @@ def readdata():
     elif obstype in sfcObsTypes:
       station = stationID
       coordVars += [station]
+    elif obstype in radianceObsTypes:
+      binCoord = Channel
 
     # loop over simulated variables
     for ivar, varName in enumerate(simulatedVariables):
@@ -447,7 +452,7 @@ def readdata():
         db[oma] = (db[oma]/db[obs])*100.
 
       # plot oma, omb from all vertical levels
-      if makeDistributionPlots and plot_allinOneDistri and obstype not in radianceObsTypes:
+      if makeDistributionPlots and plot_allinOneDistri:
 
         nProfile_bak = 0
         nProfile_ana = 0
@@ -470,8 +475,9 @@ def readdata():
           nProfile_bak = len(np.unique(db[record][passbg]))
           nProfile_ana = len(np.unique(db[record][passan]))
 
-        basic_plot_functions.plotDistri(db[latitude], db[longitude], db[omb], obstype, varName, vu.varDictObs[varName][0], expt_obs, nProfile_bak, "omb_allLevels")
-        basic_plot_functions.plotDistri(db[latitude], db[longitude], db[oma], obstype, varName, vu.varDictObs[varName][0], expt_obs, nProfile_ana, "oma_allLevels")
+        if obstype not in radianceObsTypes:
+          basic_plot_functions.plotDistri(db[latitude], db[longitude], db[omb], obstype, varName, vu.varDictObs[varName][0], expt_obs, nProfile_bak, "omb_allLevels")
+          basic_plot_functions.plotDistri(db[latitude], db[longitude], db[oma], obstype, varName, vu.varDictObs[varName][0], expt_obs, nProfile_ana, "oma_allLevels")
 
       if binCoord is not None and binCoord in db:
         binVar = binningCoordinates[binCoord]['varName']
@@ -556,6 +562,44 @@ def readdata():
                    expt_obs, varName, imageFmt, "RMS")
 
       elif obstype in radianceObsTypes:
+        binVar = binningCoordinates[binCoord]['varName']
+        ObsSpaceInfo = conf.DiagSpaceConfig.get(obstype, conf.nullDiagSpaceInfo)
+        confChans = ObsSpaceInfo.get('channels',[vu.miss_i])
+
+        plotChannels = sorted(set(confChans).intersection(set(nchans)))
+        binCenters = plotChannels
+        nBins = len(plotChannels)
+
+        binnedVars = [obs, omb, oma, obserror, errstart]
+        Count = {}
+        RMS = {}
+        dbBinned = {}
+        for var in binnedVars:
+          Count[var] = np.empty(nBins, dtype=int)
+          RMS[var] = np.empty(nBins, dtype=np.float64)
+        for i,iBin in enumerate(plotChannels):
+
+          # Different from AMSU-A and MHS, in current ABI and AHI files, 'nchans' is a subset of the whole channels.
+          # Ch_id is used to catch the index of each 'plotChannels' in 'nchans'.
+          Ch_id = np.where(nchans == iBin)[0][0]
+
+          for var in binnedVars:
+            Count[var][i] = np.isfinite(db[var][:,Ch_id]).sum()
+            if Count[var][i] > 0:
+              RMS[var][i] = np.sqrt(np.nanmean(np.square(db[var][:,Ch_id])))
+            else:
+              RMS[var][i] = np.NaN
+
+        plotprofile(RMS[omb], 'OMB',
+                    RMS[oma], 'OMA',
+                    binCenters, binVar,
+                    Count[omb], Count[oma],
+                    expt_obs, varName, imageFmt, "RMS")
+        ploterrpro(RMS[obserror], 'file ObsError',
+                   RMS[errstart], 'UFO EffectiveError',
+                   binCenters, binVar,
+                   Count[obserror], Count[errstart],
+                   expt_obs, varName, imageFmt, "RMS")
         # Generate scatter plots
         # Maximum number of variables/channels per figure
         maxsubplts = 16
@@ -620,6 +664,9 @@ def plotprofile(xVals1, xLabel1,
 
   fig, ax1 = plt.subplots()
   plt.grid(True)
+  if 'Channel' in yLabel:
+     yVals_in = yVals
+     yVals = list(range(0, len(yVals)))
   ax1.plot(xVals1, yVals,'b-o', markersize=5)
   ax1.plot(xVals2, yVals,'r--*', markersize=5)
   if varName in 'specificHumidity':
@@ -630,6 +677,9 @@ def plotprofile(xVals1, xLabel1,
   ax1.set_ylim([min(yVals), max(yVals)])
   ax1.set_ylabel(yLabel, fontsize=15)
   varUnits = '('+vu.varDictObs[varName][0]+')'
+  if 'Channel' in yLabel:
+      ax1.set_yticks(yVals)
+      ax1.set_yticklabels(yVals_in)
   if 'gnssro' in EXP_NAME:
     ax1.set_xlabel(varName+' '+metric+'[(y-h(x))/y] '+varUnits, fontsize=15)
   else:
@@ -640,6 +690,8 @@ def plotprofile(xVals1, xLabel1,
   ax2.set_yticks(yVals)
   ax2.set_ylabel('BG Count', fontsize=12)
   ax2.set_yticklabels(counts1.astype(int))
+  if 'Channel' in yLabel:
+    ax2.set_ylim(ax1.get_ylim())
 
   ax3 = ax1.twinx()
   ax3.set_yticks(yVals)
@@ -647,6 +699,8 @@ def plotprofile(xVals1, xLabel1,
   ax3.set_ylabel('AN Count', fontsize=12)
   ax3.set_yticklabels(counts2.astype(int))
 
+  if 'Channel' in yLabel:
+    ax3.set_ylim(ax1.get_ylim())
   if 'Pressure' in yLabel:
     ax1.set_yticks(yVals)
     ax1.invert_yaxis()
@@ -654,6 +708,9 @@ def plotprofile(xVals1, xLabel1,
     ax3.invert_yaxis()
 
   ax1.legend((xLabel1, xLabel2), loc='best', fontsize=15)
+  if 'Channel' in yLabel:
+    plt.gca().yaxis.set_major_locator(MaxNLocator(integer=True))
+    plt.yticks(yVals)
 
   fname = metric+'ofOMM_%s_%s.'%(EXP_NAME, varName)+fmt
   print('Saving figure to '+fname)
@@ -668,6 +725,9 @@ def ploterrpro(xVals1, xLabel1,
 
   fig, ax1 = plt.subplots()
   plt.grid(True)
+  if 'Channel' in yLabel:
+     yVals_in = yVals
+     yVals = list(range(0, len(yVals)))
   ax1.plot(xVals1, yVals,'b-o', markersize=5)
   ax1.plot(xVals2, yVals,'r--*', markersize=5)
   if varName in 'specificHumidity':
@@ -676,6 +736,9 @@ def ploterrpro(xVals1, xLabel1,
     ax1.set_xlim([0, math.ceil(np.nanmax(xVals2))])
   ax1.set_ylim([min(yVals), max(yVals)])
   ax1.set_ylabel(yLabel, fontsize=15)
+  if 'Channel' in yLabel:
+      ax1.set_yticks(yVals)
+      ax1.set_yticklabels(yVals_in)
   if 'gnssro' in EXP_NAME:
     varUnits = '(unitless)'
   else:
@@ -687,6 +750,8 @@ def ploterrpro(xVals1, xLabel1,
   ax2.set_yticks(yVals)
   ax2.set_ylabel('BG Count', fontsize=12)
   ax2.set_yticklabels(counts1.astype(int))
+  if 'Channel' in yLabel:
+    ax2.set_ylim(ax1.get_ylim())
 
   ax3 = ax1.twinx()
   ax3.set_yticks(yVals)
@@ -694,6 +759,8 @@ def ploterrpro(xVals1, xLabel1,
   ax3.set_ylabel('AN Count', fontsize=12)
   ax3.set_yticklabels(counts2.astype(int))
 
+  if 'Channel' in yLabel:
+    ax3.set_ylim(ax1.get_ylim())
   if 'Pressure' in yLabel:
     ax1.set_yticks(yVals)
     ax1.invert_yaxis()
@@ -701,6 +768,9 @@ def ploterrpro(xVals1, xLabel1,
     ax3.invert_yaxis()
 
   ax1.legend((xLabel1, xLabel2), loc='best', fontsize=15)
+  if 'Channel' in yLabel:
+    plt.gca().yaxis.set_major_locator(MaxNLocator(integer=True))
+    plt.yticks(yVals)
 
   fname = metric+'ofObsError_%s_%s.'%(EXP_NAME, varName)+fmt
   print('Saving figure to '+fname)
