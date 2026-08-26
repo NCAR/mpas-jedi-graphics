@@ -241,10 +241,8 @@ class DiagnoseModelStatistics():
       for diagName in mu.variableSpecificDiagnostics(varName, len(dataSets['bgEns'])):
         # TODO(JJG): extend to ACC diagnostic, e.g., for 500mb geopotential height
 
-        modelVarName = mu.aggModelVariable(varName)
-
         diagFunction = mu.diagnosticFunctions[diagName]
-        diagnostic = diagFunction.evaluate(modelVarName, dataSets, self.nprocs)
+        diagnostic = diagFunction.evaluate(varName, dataSets, self.nprocs)
 
         self.logger.info('diagnostic calculated: '+diagName)
 
@@ -257,50 +255,66 @@ class DiagnoseModelStatistics():
           nn = dShape[1]
         dbValsNN = dbVals[(nn,)]
 
-        # TODO: move this binning to a generic binMethod instead of creating
-        #       unique level-binned variables for, e.g., qv
-
-        if len(dShape)==2 and varName not in vu.modDiagnosticVarNames:
-          minLevel = mu.aggMinLevel(varName)
-          maxLevel = mu.aggMaxLevel(varName, nn)
-
-          # mask levels < minLevel
-          mask = bu.lessBound(dbValsNN[vu.modVarLev], minLevel)
-          diagnostic[:,mask] = np.nan
-
-          # mask levels > maxLevel
-          mask = bu.greatBound(dbValsNN[vu.modVarLev], maxLevel)
-          diagnostic[:,mask] = np.nan
-
         if np.isfinite(diagnostic).sum() == 0:
           self.logger.warning('All missing values for (varName, diagnostic): '+varName+', '+diagName)
           continue
+
+        # Named vertical-level ranges (binning_utils.py's verticalBinFilters) let a level-resolved
+        # 2D diagnostic be aggregated over a sub-range of levels into a single bin, in addition to
+        # its normal 'full' (all-levels) treatment. This only makes sense for binVarKeys that don't
+        # already resolve individual levels themselves (vu.modVarLev/vu.modVarDiagPrs already
+        # produce one bin per level, so restricting their range is redundant with the plot-time
+        # trim in MultiDimBinMethodBase/BinValAxes2D), and only for variables actually indexed by
+        # model level (vu.modDiagnosticVarNames are indexed by diagnostic-pressure level instead,
+        # so model-level bounds would not mean what they say for those).
+        levelRanges = bu.verticalBinFilters.get(vu.modVarLev, {bu.blankBinFilterFile: {}})
+        levelResolvedBinVarKeys = {vu.modVarLev, vu.modVarDiagPrs}
+        isModelLevelIndexed = nDims == 2 and varName not in vu.modDiagnosticVarNames
+
+        maskedDiagnostics = {bu.blankBinFilterFile: diagnostic}
+        if isModelLevelIndexed and len(levelRanges) > 1:
+          for rangeName, namedRange in levelRanges.items():
+            if rangeName == bu.blankBinFilterFile: continue
+            masked = diagnostic.copy()
+            masked[:, bu.maskByRange(dbValsNN[vu.modVarLev], namedRange)] = np.nan
+            maskedDiagnostics[rangeName] = masked
 
         # parallelize across binMethods
         for (binVarKey, binMethodName), binMethod in binMethods.items():
           if binMethod.excludeDiag(diagName): continue
           if binMethod.excludeVariable(varName): continue
 
-          if workers is None:
-            subStats.append(self._processBinMethod(
-              dbValsNN,
-              DiagSpaceGrp,
-              varName,
-              diagName,
-              binVarKey, binMethodName, binMethod,
-              diagnostic,
-            ))
+          if isModelLevelIndexed and binVarKey not in levelResolvedBinVarKeys:
+            applicableRanges = list(maskedDiagnostics.keys())
           else:
-            subStats.append(workers.apply_async(self._processBinMethod,
-              args=(
+            applicableRanges = [bu.blankBinFilterFile]
+
+          for rangeName in applicableRanges:
+            outputBinMethodName = binMethodName
+            if rangeName != bu.blankBinFilterFile:
+              outputBinMethodName = binMethodName+'_'+rangeName
+            diagValues = maskedDiagnostics[rangeName]
+
+            if workers is None:
+              subStats.append(self._processBinMethod(
                 dbValsNN,
                 DiagSpaceGrp,
                 varName,
                 diagName,
-                binVarKey, binMethodName, binMethod,
-                diagnostic,
-              )
-            ))
+                binVarKey, outputBinMethodName, binMethod,
+                diagValues,
+              ))
+            else:
+              subStats.append(workers.apply_async(self._processBinMethod,
+                args=(
+                  dbValsNN,
+                  DiagSpaceGrp,
+                  varName,
+                  diagName,
+                  binVarKey, outputBinMethodName, binMethod,
+                  diagValues,
+                )
+              ))
 
     if workers is None:
       for stats in subStats:
