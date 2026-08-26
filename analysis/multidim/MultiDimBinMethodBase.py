@@ -20,40 +20,46 @@ class MultiDimBinMethodBase(AnalysisBase):
 
     cldFracTransform = 'logit'
 
+    # name treated as the unfiltered/default vertical-level-filter variant; never
+    # appears in output filenames/titles (see binning_utils.py's verticalBinFilters
+    # and binFilterFile() below)
+    blankBinFilterFile = bu.blankBinFilterFile
+
     def __init__(self, db:sdb, analysisType:str, diagnosticGroupings:dict):
         super().__init__(db, analysisType, diagnosticGroupings)
         # default 1D binVars
+        # NOTE: vertical-level filtering (binFilters minvalue/maxvalue, possibly multiple named
+        # ranges) for obsVarAlt, obsVarImpact, obsVarPrs, modVarDiagPrs, and modVarLev below is
+        # configured in binning_utils.py's verticalBinFilters dict -- edit that dict, not
+        # this source file, to change it.
         self.binVarDict = {
             vu.obsVarAlt: {
               'profilefunc': bpf.plotProfile,
-              'binFilter': {
-                # maximum altitude to show on all figures
-                'maxvalue': 30000.,
-              },
+              'binFilters': bu.verticalBinFilters.get(vu.obsVarAlt, {self.blankBinFilterFile: {}}),
             },
             vu.obsVarImpact: {
               'profilefunc': bpf.plotProfile,
-              'binFilter': {
-                # maximum altitude to show on all figures
-                'maxvalue': 30000.,
-              },
+              'binFilters': bu.verticalBinFilters.get(vu.obsVarImpact, {self.blankBinFilterFile: {}}),
             },
             vu.obsVarACI: {'profilefunc': bpf.plotSeries, 'binVarTier': 3},
             vu.obsVarCldFracX: {'profilefunc': bpf.plotSeries, 'binVarTier': 2},
             vu.obsVarCldFracY: {'profilefunc': bpf.plotSeries, 'binVarTier': 1},
             vu.obsVarLat: {'profilefunc': bpf.plotProfile},
-            vu.obsVarPrs: {'profilefunc': bpf.plotProfile},
+            vu.obsVarPrs: {
+              'profilefunc': bpf.plotProfile,
+              'binFilters': bu.verticalBinFilters.get(vu.obsVarPrs, {self.blankBinFilterFile: {}}),
+            },
             vu.obsVarCI: {'profilefunc': bpf.plotSeries, 'binVarTier': 2},
             vu.obsVarLogCI: {'profilefunc': bpf.plotSeries, 'binVarTier': 3},
-            vu.modVarDiagPrs: {'profilefunc': bpf.plotProfile},
+            vu.modVarDiagPrs: {
+              'profilefunc': bpf.plotProfile,
+              'binFilters': bu.verticalBinFilters.get(vu.modVarDiagPrs, {self.blankBinFilterFile: {}}),
+            },
             # vu.modVarLat is redundant with vu.obsVarLat (both have varShort=="lat")
             #vu.modVarLat: {'profilefunc': bpf.plotProfile, 'binVarTier': 1},
             vu.modVarLev: {
               'profilefunc': bpf.plotProfile,
-              'binFilter': {
-                # maximum model level to show on all figures
-                #'maxvalue': 40,
-              },
+              'binFilters': bu.verticalBinFilters.get(vu.modVarLev, {self.blankBinFilterFile: {}}),
             },
             vu.obsVarGlint: {'profilefunc': bpf.plotSeries, 'binVarTier': 3},
             vu.obsVarLandFrac: {'profilefunc': bpf.plotSeries, 'binVarTier': 3},
@@ -110,22 +116,55 @@ class MultiDimBinMethodBase(AnalysisBase):
 
                 #Make figures for all binMethods
                 binMethods = self.db.dfw.levels('binMethod', binVarLoc)
+                binFilters = options.get('binFilters', {self.blankBinFilterFile: {}})
                 for binMethod in binMethods:
 
                     #TODO: REMOVE, for testing only
                     #if binMethod != bu.identityBinMethod: continue
 
-                    self.logger.info(diagnosticGroup+', '+binVar+', '+binMethod)
+                    #Make figures for all named vertical-level filters (usually just
+                    #'full', i.e. unfiltered, unless additional named ranges are configured
+                    #in binning_utils.py's verticalBinFilters)
+                    for filterName, binFilter in binFilters.items():
+                        self.logger.info(diagnosticGroup+', '+binVar+', '+binMethod+', '+filterName)
 
-                    if useWorkers:
-                        workers.apply_async(self.innerloopsWrapper,
-                            args = (diagnosticGroup, diagnosticConfigs, binVar, binMethod, selectedStatistics, options))
-                    else:
-                        self.innerloopsWrapper(
-                            diagnosticGroup, diagnosticConfigs, binVar, binMethod, selectedStatistics, options)
+                        if useWorkers:
+                            workers.apply_async(self.innerloopsWrapper,
+                                args = (diagnosticGroup, diagnosticConfigs, binVar, binMethod, selectedStatistics, options, filterName, binFilter))
+                        else:
+                            self.innerloopsWrapper(
+                                diagnosticGroup, diagnosticConfigs, binVar, binMethod, selectedStatistics, options, filterName, binFilter)
+
+    @staticmethod
+    def maskByBinFilter(numVals, binFilter):
+        '''
+        Given an array-like of numeric binVals and a binFilter dict with optional
+        'minvalue'/'maxvalue' keys, return a boolean mask that is True where the
+        value should be REMOVED (i.e., keep numVals[~mask]). Used to implement
+        vertical-level filtering (see binning_utils.py's verticalBinFilters)
+        for both single-axis (MultiDimBinMethodBase) and 2D (BinValAxes2D) plots.
+        Thin wrapper around bu.maskByRange.
+        '''
+        return bu.maskByRange(numVals, binFilter)
+
+    def binFilterFile(self, filterName):
+        '''
+        Format a vertical-level filter name for file/title naming, mirroring
+        binMethodFile(): the default/unfiltered name (blankBinFilterFile) is left off
+        entirely; any other name becomes a distinguishing '_'+filterName suffix.
+        '''
+        if filterName is None or filterName == self.blankBinFilterFile:
+            return ''
+        return '_'+filterName
 
     def innerloopsWrapper(self,
-        diagnosticGroup, diagnosticConfigs, binVar, binMethod, selectedStatistics, options):
+        diagnosticGroup, diagnosticConfigs, binVar, binMethod, selectedStatistics, options,
+        filterName = None, binFilter = None):
+
+        if filterName is None:
+            filterName = self.blankBinFilterFile
+        if binFilter is None:
+            binFilter = {}
 
         myLoc = {}
         myLoc['binVar'] = binVar
@@ -147,6 +186,9 @@ class MultiDimBinMethodBase(AnalysisBase):
         for key in mydfwDict.keys():
             mydfwDict[key] = sdb.DFWrapper.fromLoc(mydfwDict[key], myLoc)
 
+        # not a database query field; only used downstream (e.g. filenames/titles) via myLoc
+        myLoc['binFilterName'] = filterName
+
         ## Get all float/int binVals associated with binVar
         binStrVals = mydfwDict['dfw'].levels('binVal')
         binUnits = mydfwDict['dfw'].uniquevals('binUnits')[0]
@@ -165,23 +207,15 @@ class MultiDimBinMethodBase(AnalysisBase):
             binNumVals.append(self.allBinNumVals[ibin])
 
         # filter out binVals less than (greater than) minvalue (maxvalue)
-        binFilter = options.get('binFilter', None)
-        # Example to include only values from 3 to 40:
-        # 'binFilter': {
-        #   'minvalue': 3,
-        #   'maxvalue': 40,
-        # }
-        if binFilter is not None:
-          remove = np.full_like(binNumVals, False, bool)
-          minvalue = binFilter.get('minvalue', None)
-          if minvalue is not None:
-            less = bu.lessBound(np.asarray(binNumVals), minvalue)
-            remove[less] = True
-          maxvalue = binFilter.get('maxvalue', None)
-          if maxvalue is not None:
-            great = bu.greatBound(np.asarray(binNumVals), maxvalue)
-            remove[great] = True
-
+        # works for any vertical coordinate type (model level, pressure, height, ...)
+        # since binFilter is scoped per binVar in binVarDict; set minvalue==maxvalue
+        # to keep a single level, or omit one bound to only clip the other end.
+        # For vertical binVars, minvalue/maxvalue are set via binning_utils.py's
+        # verticalBinFilters dict (see __init__ above), not hardcoded here. The specific
+        # named filter to apply (usually just 'full', i.e. unfiltered) is selected by
+        # analyze_() and passed in as binFilter/filterName above.
+        if binFilter:
+          remove = self.maskByBinFilter(binNumVals, binFilter)
           binStrVals = list(np.asarray(binStrVals)[~remove])
           binNumVals = list(np.asarray(binNumVals)[~remove])
 

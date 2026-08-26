@@ -186,8 +186,9 @@ class CYandBinValAxes2D(MultiDimBinMethodBase):
 
                     iplot = iplot + 1
 
-            filename = ('%s%s_BinValAxisTSeries_%smin_%s_%s_%s'%(
+            filename = ('%s%s%s_BinValAxisTSeries_%smin_%s_%s_%s'%(
                        myLoc['binVar'], self.binMethodFile(myLoc['binMethod']),
+                       self.binFilterFile(myLoc['binFilterName']),
                        fcTDelta_totmin, self.DiagSpaceName,
                        diagnosticGroup, statName))
 
