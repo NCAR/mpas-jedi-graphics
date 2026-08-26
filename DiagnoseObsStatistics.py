@@ -296,13 +296,13 @@ class DiagnoseObsStatistics:
     for ss in su.allFileStats:
       statsDict[ss] = []
 
-    # Named vertical-level ranges (binning_utils.py's verticalBinFilters) let an obs-space
-    # diagnostic be aggregated over a sub-range of levels into a single bin, in addition to its
-    # normal 'full' (all-levels) treatment -- for contexts where the vertical binVar isn't itself a
-    # plot axis (e.g. LonLat2D maps). This only applies for whichever vertical binVar(s) this
-    # ObsSpace actually bins by (so its metadata was already read into dbVals) and is skipped for
-    # that same binVarKey (redundant with the existing plot-time trim in
-    # MultiDimBinMethodBase/BinValAxes2D).
+    # Named vertical-level ranges (binning_utils.py's verticalBinFilters, scoped by
+    # verticalBinFilterVariables) let an obs-space diagnostic be aggregated over a sub-range of
+    # levels into a single bin, in addition to its normal 'full' (all-levels) treatment -- for
+    # contexts where the vertical binVar isn't itself a plot axis (e.g. LonLat2D maps). This only
+    # applies for whichever vertical binVar(s) this ObsSpace actually bins by (so its metadata was
+    # already read into dbVals) and is skipped for that same binVarKey (redundant with the
+    # existing plot-time trim in MultiDimBinMethodBase/BinValAxes2D).
     maskedDiagnostics = {bu.blankBinFilterFile: diagValues}
     levelResolvedBinVarKeys = set()
     for obsVarKey, metaKey in self._verticalBinVarMeta:
@@ -313,11 +313,9 @@ class DiagnoseObsStatistics:
       if metaVals is None: continue
 
       levelResolvedBinVarKeys.add(obsVarKey)
-      for rangeName, namedRange in levelRanges.items():
-        if rangeName == bu.blankBinFilterFile or rangeName in maskedDiagnostics: continue
-        masked = diagValues.copy()
-        masked[bu.maskByRange(metaVals, namedRange)] = np.nan
-        maskedDiagnostics[rangeName] = masked
+      variants = bu.verticalRangeVariants(diagValues, metaVals, levelRanges, varName, obsVarKey)
+      for rangeName, values in variants.items():
+        maskedDiagnostics.setdefault(rangeName, values)
 
     for (binVarKey, binMethodName), binMethod in binMethods.items():
       if binMethod.excludeDiag(diagName): continue
@@ -333,15 +331,10 @@ class DiagnoseObsStatistics:
       binVarName, binGrpName = vu.splitObsVarGrp(binVarKey)
       binVarShort, binVarUnits = vu.varAttributes(binVarName)
 
-      if binVarKey in levelResolvedBinVarKeys:
-        applicableRanges = [bu.blankBinFilterFile]
-      else:
-        applicableRanges = list(maskedDiagnostics.keys())
+      applicableRanges = bu.applicableFilterRanges(binVarKey, levelResolvedBinVarKeys, maskedDiagnostics)
 
       for rangeName in applicableRanges:
-        outputBinMethodName = binMethodName
-        if rangeName != bu.blankBinFilterFile:
-          outputBinMethodName = binMethodName+'_'+rangeName
+        outputBinMethodName = bu.suffixedBinMethodName(binMethodName, rangeName)
         theseDiagValues = maskedDiagnostics[rangeName]
 
         binVals = binMethod.getvalues()

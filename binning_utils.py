@@ -99,6 +99,24 @@ verticalBinFilters = {
   },
 }
 
+# Optional per-variable allowlist restricting which variables the COLLECTION-TIME aggregate
+# mechanism (DiagnoseModelStatistics.py/DiagnoseObsStatistics.py, via verticalRangeVariants()
+# below) runs its named ranges for. Keyed the same way as verticalBinFilters above. A binVarKey
+# with no entry here is unrestricted (every variable binned by it gets every named range); an
+# entry restricts to just the listed variable names (the same varName values passed to
+# binMethod.excludeVariable/evaluate).
+#
+# This does NOT affect the plot-time axis trim (MultiDimBinMethodBase/BinValAxes2D) -- that's
+# already cheap (it subsets already-computed rows) and variable-agnostic by construction. The
+# collection-time mechanism is the expensive one: it reruns every eligible binMethod once per
+# named range per variable, so an unrestricted vu.modVarLev range set multiplies the cost of
+# every level-indexed model variable, not just the ones you actually want the range-aggregated
+# stats for. Default to just 'qv', matching the qv-specific mechanism this generalizes (see
+# verticalBinFilters[vu.modVarLev] above); add more names, or clear the set, to widen it.
+verticalBinFilterVariables = {
+  vu.modVarLev: {'qv'},
+}
+
 def maskByRange(numVals, namedRange):
   '''
   Given an array-like of numeric values and a namedRange dict with optional 'minvalue'/'maxvalue'
@@ -118,6 +136,59 @@ def maskByRange(numVals, namedRange):
   if maxvalue is not None:
     remove[greatBound(numVals, maxvalue)] = True
   return remove
+
+def verticalRangeVariants(diagValues, coordVals, levelRanges, varName, binVarKey, axis=None):
+  '''
+  Build named masked variants of diagValues for the collection-time vertical-level-range
+  aggregation mechanism (DiagnoseModelStatistics.py/DiagnoseObsStatistics.py). Always returns
+  a dict starting with {blankBinFilterFile: diagValues} (the input unchanged); adds one entry
+  per additional named range in levelRanges, each a copy of diagValues with out-of-range
+  coordVals masked to NaN, UNLESS levelRanges has only the default 'full' entry or varName is
+  excluded by verticalBinFilterVariables[binVarKey] (see above).
+
+  coordVals gives, for each position along `axis` of diagValues (or each element of diagValues
+  itself when axis is None), the numeric value to test against each named range -- e.g. model
+  level index (model, axis=1: one coordVal per column) or per-observation metadata (obs,
+  axis=None: one coordVal per element).
+  '''
+  maskedDiagnostics = {blankBinFilterFile: diagValues}
+  if len(levelRanges) <= 1:
+    return maskedDiagnostics
+  allowedVars = verticalBinFilterVariables.get(binVarKey)
+  if allowedVars is not None and varName not in allowedVars:
+    return maskedDiagnostics
+  for rangeName, namedRange in levelRanges.items():
+    if rangeName == blankBinFilterFile: continue
+    mask = maskByRange(coordVals, namedRange)
+    masked = diagValues.copy()
+    if axis is None:
+      masked[mask] = np.nan
+    else:
+      index = [slice(None)] * masked.ndim
+      index[axis] = mask
+      masked[tuple(index)] = np.nan
+    maskedDiagnostics[rangeName] = masked
+  return maskedDiagnostics
+
+def applicableFilterRanges(binVarKey, levelResolvedBinVarKeys, maskedDiagnostics):
+  '''
+  Named ranges (keys of maskedDiagnostics, see verticalRangeVariants above) that should be
+  aggregated separately for this binVarKey: all of them, unless binVarKey is itself one of the
+  already-level-resolved binVarKeys (redundant with the plot-time axis trim), in which case only
+  the unfiltered 'full' variant applies.
+  '''
+  if binVarKey in levelResolvedBinVarKeys:
+    return [blankBinFilterFile]
+  return list(maskedDiagnostics.keys())
+
+def suffixedBinMethodName(binMethodName, rangeName):
+  '''
+  Mirrors MultiDimBinMethodBase.binFilterFile(): tag a collection-time binMethod name with the
+  named vertical-level-range it was aggregated over, unless it's the default/unfiltered range.
+  '''
+  if rangeName == blankBinFilterFile:
+    return binMethodName
+  return binMethodName+'_'+rangeName
 
 #LocalHour
 LH0  = 0.0
