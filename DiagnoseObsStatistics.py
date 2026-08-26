@@ -84,6 +84,11 @@ class DiagnoseObsStatistics:
         logger.error('JEDI Application is not supported:: '+self.args.jediAppName)
     obsVars = jdbs[vu.mean].varList(osKey, obsFKey, markerGroup)
 
+    # must be read while jdbs[vu.mean]'s handles are still open (they're destroyed below,
+    # once dbVals have been read, but fileFormat is also needed afterward to resolve vertical
+    # binVar metadata aliases -- see _processBinMethods)
+    fileFormat = jdbs[vu.mean].fileFormat(osKey, obsFKey)
+
     ########################################################
     ## Construct dictionary of binMethods for this ObsSpace
     ########################################################
@@ -101,7 +106,7 @@ class DiagnoseObsStatistics:
                 len(config['filters']) < 1): continue
 
             config['dsName'] = ObsSpaceName
-            config['fileFormat'] = jdbs[vu.mean].fileFormat(osKey, obsFKey)
+            config['fileFormat'] = fileFormat
 
             binMethods[(binVarKey, binMethodName)] = bu.BinMethod(config)
 
@@ -115,7 +120,7 @@ class DiagnoseObsStatistics:
     diagnosticConfigs = du.diagnosticConfigs(
         selectDiagNames, ObsSpaceName,
         includeEnsembleDiagnostics = (nMembers > 1),
-        fileFormat = jdbs[vu.mean].fileFormat(osKey, obsFKey))
+        fileFormat = fileFormat)
 
 
     #####################################################
@@ -190,8 +195,6 @@ class DiagnoseObsStatistics:
 
     logger.info('Calculating diagnostic statistics')
     logger.info("with "+str(self.nprocs)+" out of "+str(mp.cpu_count())+" processors")
-
-    fileFormat = jdbs[vu.mean].fileFormat(osKey, obsFKey)
 
     subStats = []
     for varName in obsVars:
