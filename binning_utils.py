@@ -44,6 +44,81 @@ alt_jet_val = '{:.0f}'.format(0.5 * (alt_jet_min + alt_jet_max))
 altjetMethod = 'alt='+alt_jet_val+'m'
 impactjetMethod = 'alt='+alt_jet_val+'m'
 
+#===========================
+# named vertical-level ranges
+#===========================
+# name treated as the unfiltered/default vertical-level range; never appears in output
+# filenames/titles/binMethod suffixes (see MultiDimBinMethodBase.binFilterFile() and
+# DiagnoseModelStatistics.py's use of this constant)
+blankBinFilterFile = 'full'
+
+# Named vertical-level ranges, per vertical bin variable. Each vertical binVar maps to a dict of
+# NAMED ranges; each named range is itself a dict that may contain 'minvalue' and/or 'maxvalue':
+#   + both minvalue and maxvalue -> that range
+#   + minvalue == maxvalue       -> a single level
+#   + only one of the two        -> clip only that end, leaving the other open
+#   + neither (empty dict {})    -> the full range, no restriction
+#
+# 'full' is the name for the whole range (no restriction) -- it never adds a suffix to output
+# filenames (matching how the default binMethod is left off filenames). Any other name (e.g. 'trop')
+# is appended to filenames/titles as '_<name>'.
+#
+# These ranges are NOT tied to any specific diagnosed variable -- they apply to whichever variable
+# is plotted/aggregated against these binVars -- which is why they live here rather than var_utils.py.
+#
+# Two independent consumers:
+#  + MultiDimBinMethodBase/BinValAxes2D trim an already-computed, per-level-resolved plot axis to a
+#    named range, preserving per-level resolution within it.
+#  + DiagnoseModelStatistics.py aggregates each non-'full' named range into a single Count/Mean/
+#    RMS/STD bin, tagged via a suffixed binMethod name, for contexts where the vertical binVar isn't
+#    itself a plot axis (e.g. domain-wide/regional time series). This generalizes what used to be a
+#    qv-specific mechanism (modelsp_utils.py's aggregatedVariableConfig, which faked variable names
+#    like 'qv01to10') to apply uniformly to any level-resolved variable, driven by this dict instead
+#    of hand-duplicated per-variable code. Because vu.modVarLev's ranges are shared with the
+#    plot-time-trim consumer above, adding a range here also produces trimmed profile-plot variants
+#    for every model variable binned by vu.modVarLev, not just the one(s) the aggregate mechanism
+#    cares about -- that is intentional.
+verticalBinFilters = {
+  # vu.obsVarAlt/vu.obsVarImpact units are meters
+  vu.obsVarAlt:     {'full': {'maxvalue': 30000.}},
+  vu.obsVarImpact:  {'full': {'maxvalue': 30000.}},
+  # vu.obsVarPrs units are hPa
+  vu.obsVarPrs:     {'full': {}},
+  # vu.modVarDiagPrs units are Pa
+  vu.modVarDiagPrs: {'full': {}},
+  # vu.modVarLev is a dimensionless model-level index; these ranges reproduce (generically) what
+  # was previously only available for qv via modelsp_utils.py's aggregatedVariableConfig
+  vu.modVarLev:     {
+      'full'    : {},
+      'L01to30' : {'maxvalue': 30},
+      'L01to10' : {'minvalue': 1,  'maxvalue': 10},
+      'L11to20' : {'minvalue': 11, 'maxvalue': 20},
+      'L21to30' : {'minvalue': 21, 'maxvalue': 30},
+      'L31to40' : {'minvalue': 31, 'maxvalue': 40},
+      'L41to55' : {'minvalue': 41, 'maxvalue': 55},
+  },
+}
+
+def maskByRange(numVals, namedRange):
+  '''
+  Given an array-like of numeric values and a namedRange dict with optional 'minvalue'/'maxvalue'
+  keys (see verticalBinFilters above), return a boolean mask that is True where the value is
+  OUTSIDE the range (i.e. should be removed/excluded; keep numVals[~mask]). Shared by the
+  plot-time trim (MultiDimBinMethodBase.maskByBinFilter/BinValAxes2D) and the collection-time
+  aggregate mechanism (DiagnoseModelStatistics.py).
+  '''
+  numVals = np.asarray(numVals)
+  remove = np.full_like(numVals, False, bool)
+  if not namedRange:
+    return remove
+  minvalue = namedRange.get('minvalue', None)
+  if minvalue is not None:
+    remove[lessBound(numVals, minvalue)] = True
+  maxvalue = namedRange.get('maxvalue', None)
+  if maxvalue is not None:
+    remove[greatBound(numVals, maxvalue)] = True
+  return remove
+
 #LocalHour
 LH0  = 0.0
 LH1  = 23.0
