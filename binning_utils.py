@@ -80,11 +80,28 @@ blankBinFilterFile = 'full'
 #    cares about -- that is intentional.
 verticalBinFilters = {
   # vu.obsVarAlt/vu.obsVarImpact units are meters
-  vu.obsVarAlt:     {'full': {'maxvalue': 30000.}},
-  vu.obsVarImpact:  {'full': {'maxvalue': 30000.}},
-  # vu.obsVarPrs units are hPa
-  vu.obsVarPrs:     {'full': {}},
-  # vu.modVarDiagPrs units are Pa
+  # 'jet' reproduces the jet-stream altitude band formerly hardcoded into the now-removed
+  # altjetMethod/impactjetMethod binMethod entries under vu.obsVarLat in predefined_configs.py
+  # (see config.py's gnssro binVarConfigs) -- this generic mechanism now produces the equivalent
+  # '<binMethod>_jet' suffixed output for whatever plain binMethod is registered there instead.
+  vu.obsVarAlt:     {
+      'full': {'maxvalue': 30000.},
+      'jet':  {'minvalue': alt_jet_min, 'maxvalue': alt_jet_max},
+  },
+  vu.obsVarImpact:  {
+      'full': {'maxvalue': 30000.},
+      'jet':  {'minvalue': alt_jet_min, 'maxvalue': alt_jet_max},
+  },
+  # vu.obsVarPrs units are hPa. 'jet' reproduces the jet-stream pressure band formerly hardcoded
+  # into the now-removed PjetMethod binMethod entry under vu.obsVarLat (see config.py's
+  # profilePressureBinVars) -- see comment above.
+  vu.obsVarPrs:     {
+      'full': {},
+      'jet':  {'minvalue': P_jet_min, 'maxvalue': P_jet_max},
+  },
+  # vu.modVarDiagPrs is actually hPa, not Pa as this comment previously claimed --
+  # modelsp_utils.diagnosticPressures = [50,100,200,250,500,700,850,925] (its own comment says
+  # "diagnostic pressures (hPa)").
   vu.modVarDiagPrs: {'full': {}},
   # vu.modVarLev is a dimensionless model-level index; these ranges reproduce (generically) what
   # was previously only available for qv via modelsp_utils.py's aggregatedVariableConfig

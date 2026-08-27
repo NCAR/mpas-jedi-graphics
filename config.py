@@ -58,8 +58,9 @@ surfBinVars[vu.obsVarLat] += [bu.latbandsMethod]
 profilePressureBinVars = deepcopy(obsBinVars)
 profilePressureBinVars[vu.obsVarPrs] += [bu.identityBinMethod, bu.PjetMethod]
 profilePressureBinVars[vu.obsVarLat] += [bu.latbandsMethod]
-# priority 2
-profilePressureBinVars[vu.obsVarLat] += [bu.PjetMethod]
+# jet-stream-band-restricted latbandsMethod variant is produced automatically by the
+# collection-time vertical-level-range aggregation, driven by the 'jet' named range in
+# binning_utils.verticalBinFilters[vu.obsVarPrs] -- see binning_utils.py
 
 # pseudo-2D pressure bins with named latitude-band methods
 # priority 1
@@ -97,10 +98,12 @@ gnssrobndBinVars = deepcopy(gnssroBinVars)
 ## priority 1
 # pseudo altitude bins
 gnssrorefBinVars[vu.obsVarAlt] += [bu.identityBinMethod, bu.altjetMethod]
-gnssrorefBinVars[vu.obsVarLat] += [bu.altjetMethod]
+# jet-stream-band-restricted polarlatbandsMethod variant is produced automatically by the
+# collection-time vertical-level-range aggregation, driven by the 'jet' named range in
+# binning_utils.verticalBinFilters[vu.obsVarAlt] -- see binning_utils.py
 
 gnssrobndBinVars[vu.obsVarImpact] += [bu.identityBinMethod, bu.altjetMethod]
-gnssrobndBinVars[vu.obsVarLat] += [bu.impactjetMethod]
+# ditto, driven by binning_utils.verticalBinFilters[vu.obsVarImpact]
 
 # pseudo-2D altitude bins with named latitude-band methods
 for latBand in pconf.namedPolarLatBands['values']:
