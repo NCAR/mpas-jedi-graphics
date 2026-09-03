@@ -785,8 +785,9 @@ class BinValAxes2D(MultiDimBinMethodBase):
             self.write_figure_yaml(figureData, dataPath, filename)
 
             for region_name, zoom in zoomed_figs.items():
-                zoom_filename = ('%s%s%s_BinValAxes2D_%smin_%s_%s_%s'%(
+                zoom_filename = ('%s%s%s%s_BinValAxes2D_%smin_%s_%s_%s'%(
                                myLoc['binVar'],
+                               self.binMethodFile(myLoc['binMethod']),
                                self.binMethodFile(region_name), filterSuffix,
                                fcTDelta_totmin, self.DiagSpaceName,
                                diagnosticGroup, statName))
