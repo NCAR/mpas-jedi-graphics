@@ -116,6 +116,15 @@ verticalBinFilters = {
   },
 }
 
+# Flat, cross-binVar union of every named vertical-level range (excluding blankBinFilterFile).
+# Used by CategoryBinMethodBase to discover collection-time-aggregated binMethod rows tagged via
+# suffixedBinMethodName() below (e.g. 'identity_L01to10'), since that suffix convention does not
+# itself encode which vertical binVar produced the range.
+allVerticalRangeNames = sorted({
+    name for filters in verticalBinFilters.values()
+    for name in filters if name != blankBinFilterFile
+})
+
 # Optional per-variable allowlist restricting which variables the COLLECTION-TIME aggregate
 # mechanism (DiagnoseModelStatistics.py/DiagnoseObsStatistics.py, via verticalRangeVariants()
 # below) runs its named ranges for. Keyed the same way as verticalBinFilters above. A binVarKey
