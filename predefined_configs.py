@@ -1234,6 +1234,25 @@ for binVar, rangeVar in obsLatBinVars.items():
             'override_exclusiveDiags': rangeVar[1],
         }
 
+    # region-specific bins, named after each vu.obsRegionBinVar region (e.g. 'MELISSA2025'):
+    # this binVar's own bin filters + the region's own filters (lat/lon box and AnyBadQC),
+    # so the box is defined only in the region entry; regions without filters are skipped
+    for region, regionConfig in binVarConfigs[vu.obsRegionBinVar].items():
+        regionFilters = regionConfig['filters']
+        if len(regionFilters) < 1: continue
+        binVarConfigs[binVar][region] = {
+            'filters': [
+                {'where': bu.lessBound,
+                 'variable': rangeVar[0],
+                 'bounds': binAxes1D[binVar].starts()},
+                {'where': bu.greatEqualBound,
+                 'variable': rangeVar[0],
+                 'bounds': binAxes1D[binVar].stops()},
+            ]+regionFilters,
+            'values': binAxes1D[binVar].values(),
+            'override_exclusiveDiags': rangeVar[1],
+        }
+
 # Add named latitude-band-specific bins for model-space ranged variables
 modelLatBinVars = {
     vu.modVarLev: [vu.levModel, int, namedTropLatBands, vu.modVarNamesBase3d],
@@ -1259,6 +1278,22 @@ for binVar, rangeVar in modelLatBinVars.items():
                  'variable': vu.latModel,
                  'bounds': latStop},
             ],
+            'values': binAxes1D[binVar].values(),
+            'include variables': rangeVar[3]
+        }
+
+    # region-specific bins, named after each vu.modelRegionBinVar region (e.g. 'MELISSA2025'):
+    # this binVar's own bin filters + the region's lat/lon box (from the obs region entry,
+    # via _obs_to_model_region_config); regions without filters are skipped
+    for region, regionConfig in binVarConfigs[vu.modelRegionBinVar].items():
+        regionFilters = regionConfig['filters']
+        if len(regionFilters) < 1: continue
+        binVarConfigs[binVar][region] = {
+            'filters': [
+                {'where': bu.notEqualBound,
+                 'variable': rangeVar[0],
+                 'bounds': binAxes1D[binVar].centrals(astype=rangeVar[1])},
+            ]+regionFilters,
             'values': binAxes1D[binVar].values(),
             'include variables': rangeVar[3]
         }

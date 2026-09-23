@@ -48,9 +48,11 @@ class CategoryBinMethodBase(AnalysisBase):
             (vu.obsVarLandFrac, bu.surfbandsMethod): {'binVarTier': 3},
         }
 
-        # Add regional bins from config
-        for method in obsBinVars[vu.obsRegionBinVar]:
+        # Add regional bins from config (model-space regions are the same as obs-space regions;
+        # see config.modelBinVars)
+        for method in obsBinVars.get(vu.obsRegionBinVar, []):
             self.binVarDict[(vu.obsRegionBinVar, method)] = {}
+            self.binVarDict[(vu.modelRegionBinVar, method)] = {}
 
         self.logger.debug(self.binVarDict)
         self.maxDiagnosticsPerAnalysis = 10 // self.nExp
