@@ -2,6 +2,7 @@
 
 import itertools as itt
 import logging
+import string
 from typing import Any
 import matplotlib.colors as mplcolors
 import matplotlib.pyplot as plt
@@ -219,44 +220,8 @@ else:
 
 
 ## subplot title labels
-subplotIterator = [
-'a', 'b', 'c', 'd', 'e',
-'f', 'g', 'h', 'i', 'j',
-'k', 'l', 'm', 'n', 'o',
-'p', 'q', 'r', 's', 't',
-'y', 'v', 'w', 'x', 'y',
-'z',
-'A', 'B', 'C', 'D', 'E',
-'F', 'G', 'H', 'I', 'J',
-'K', 'L', 'M', 'N', 'O',
-'P', 'Q', 'R', 'S', 'T',
-'Y', 'V', 'W', 'X', 'Y',
-'Z',
-'aa', 'ab', 'ac', 'ad', 'ae',
-'af', 'ag', 'ah', 'ai', 'aj',
-'ak', 'al', 'am', 'an', 'ao',
-'ap', 'aq', 'ar', 'as', 'at',
-'ay', 'av', 'aw', 'ax', 'ay',
-'az',
-'ba', 'bb', 'bc', 'bd', 'be',
-'bf', 'bg', 'bh', 'bi', 'bj',
-'bk', 'bl', 'bm', 'bn', 'bo',
-'bp', 'bq', 'br', 'bs', 'bt',
-'by', 'bv', 'bw', 'bx', 'by',
-'bz',
-'ca', 'cb', 'cc', 'cd', 'ce',
-'cf', 'cg', 'ch', 'ci', 'cj',
-'ck', 'cl', 'cm', 'cn', 'co',
-'cp', 'cq', 'cr', 'cs', 'ct',
-'cy', 'cv', 'cw', 'cx', 'cy',
-'cz',
-'da', 'db', 'dc', 'dd', 'de',
-'df', 'dg', 'dh', 'di', 'dj',
-'dk', 'dl', 'dm', 'dn', 'do',
-'dp', 'dq', 'dr', 'ds', 'dt',
-'dy', 'dv', 'dw', 'dx', 'dy',
-'dz',
-]
+subplotIterator = (list(string.ascii_lowercase) + list(string.ascii_uppercase)
+  + [p+c for p in 'abcd' for c in string.ascii_lowercase])
 
 def subplotLabel(index = 0):
   if index < 0:
