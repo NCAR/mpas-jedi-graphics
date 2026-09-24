@@ -114,8 +114,9 @@ class CYandBinValAxes2D(MultiDimBinMethodBase):
                     expLoc = deepcopy(planeLoc)
                     expLoc['expName'] = expName
 
-                    # define subplot title
-                    if useRelativeDifference:
+                    # define subplot title; units apply wherever absolute values are shown,
+                    # including the control panel when the others are relative differences
+                    if useRelativeDifference and expName != cntrlLoc['expName']:
                         title = varName
                     else:
                         title = varLabel
