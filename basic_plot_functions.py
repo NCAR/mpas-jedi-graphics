@@ -821,6 +821,9 @@ def plotSeries(fig,
         transform = axisTransform(indepConfig['transform'])
         locator = transform.locator()
         ax.set_xscale('function', functions=(transform.forward(), transform.inverse()))
+        # pin limits to the bins' range: autoscale margins can extend past the transform's
+        # valid domain (e.g., negative pressure), which leaves the axes blank
+        ax.set_xlim(np.nanmin(xVals), np.nanmax(xVals))
         ax.xaxis.set_major_locator(locator(xVals))
         ax.tick_params(axis='x', rotation=60.)
 
@@ -1103,6 +1106,9 @@ def plotProfile(fig,
         transform = axisTransform(indepConfig['transform'])
         locator = transform.locator()
         ax.set_yscale('function', functions=(transform.forward(), transform.inverse()))
+        # pin limits to the bins' range: autoscale margins can extend past the transform's
+        # valid domain (e.g., negative pressure), which leaves the axes blank
+        ax.set_ylim(np.nanmin(yVals), np.nanmax(yVals))
         ax.yaxis.set_major_locator(locator(yVals))
 
     ax.tick_params(axis='both', which='major', labelsize=3)
