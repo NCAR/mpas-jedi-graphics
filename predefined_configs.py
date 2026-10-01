@@ -727,60 +727,12 @@ binVarConfigs = {
             ],
             'values': namedPolarLatBands['values'],
         },
-        bu.PjetMethod: {
-            'filters': [
-                {'where': bu.lessBound,
-                 'variable': vu.latMeta,
-                 'bounds': binAxes1D[vu.obsVarLat].starts()},
-                {'where': bu.greatEqualBound,
-                 'variable': vu.latMeta,
-                 'bounds': binAxes1D[vu.obsVarLat].stops()},
-                {'where': bu.lessBound,
-                 'variable': vu.prsMeta,
-                 'bounds': bu.P_jet_min},
-                {'where': bu.greatEqualBound,
-                 'variable': vu.prsMeta,
-                 'bounds': bu.P_jet_max},
-                AnyBadQC,
-            ],
-            'values': binAxes1D[vu.obsVarLat].values(),
-        },
-        bu.altjetMethod: {
-            'filters': [
-                {'where': bu.lessBound,
-                 'variable': vu.latMeta,
-                 'bounds': binAxes1D[vu.obsVarLat].starts()},
-                {'where': bu.greatEqualBound,
-                 'variable': vu.latMeta,
-                 'bounds': binAxes1D[vu.obsVarLat].stops()},
-                {'where': bu.lessBound,
-                 'variable': vu.altMeta,
-                 'bounds': bu.alt_jet_min},
-                {'where': bu.greatEqualBound,
-                 'variable': vu.altMeta,
-                 'bounds': bu.alt_jet_max},
-                AnyBadQC,
-            ],
-            'values': binAxes1D[vu.obsVarLat].values(),
-        },
-        bu.impactjetMethod: {
-            'filters': [
-                {'where': bu.lessBound,
-                 'variable': vu.latMeta,
-                 'bounds': binAxes1D[vu.obsVarLat].starts()},
-                {'where': bu.greatEqualBound,
-                 'variable': vu.latMeta,
-                 'bounds': binAxes1D[vu.obsVarLat].stops()},
-                {'where': bu.lessBound,
-                 'variable': vu.impactMeta,
-                 'bounds': bu.alt_jet_min},
-                {'where': bu.greatEqualBound,
-                 'variable': vu.impactMeta,
-                 'bounds': bu.alt_jet_max},
-                AnyBadQC,
-            ],
-            'values': binAxes1D[vu.obsVarLat].values(),
-        },
+        # jet-stream-band-restricted lat-band variants (formerly bu.PjetMethod/altjetMethod/
+        # impactjetMethod here) are now produced generically by the collection-time
+        # vertical-level-range aggregation mechanism (binning_utils.verticalRangeVariants),
+        # driven by the 'jet' named range in binning_utils.verticalBinFilters[vu.obsVarPrs/
+        # obsVarAlt/obsVarImpact] -- see e.g. latbandsMethod_jet in output. No dedicated
+        # binMethod entry is needed here anymore.
     },
     vu.obsVarLandFrac: {
         bu.surfbandsMethod: {

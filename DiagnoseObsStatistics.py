@@ -84,6 +84,11 @@ class DiagnoseObsStatistics:
         logger.error('JEDI Application is not supported:: '+self.args.jediAppName)
     obsVars = jdbs[vu.mean].varList(osKey, obsFKey, markerGroup)
 
+    # must be read while jdbs[vu.mean]'s handles are still open (they're destroyed below,
+    # once dbVals have been read, but fileFormat is also needed afterward to resolve vertical
+    # binVar metadata aliases -- see _processBinMethods)
+    fileFormat = jdbs[vu.mean].fileFormat(osKey, obsFKey)
+
     ########################################################
     ## Construct dictionary of binMethods for this ObsSpace
     ########################################################
@@ -101,7 +106,7 @@ class DiagnoseObsStatistics:
                 len(config['filters']) < 1): continue
 
             config['dsName'] = ObsSpaceName
-            config['fileFormat'] = jdbs[vu.mean].fileFormat(osKey, obsFKey)
+            config['fileFormat'] = fileFormat
 
             binMethods[(binVarKey, binMethodName)] = bu.BinMethod(config)
 
@@ -115,7 +120,7 @@ class DiagnoseObsStatistics:
     diagnosticConfigs = du.diagnosticConfigs(
         selectDiagNames, ObsSpaceName,
         includeEnsembleDiagnostics = (nMembers > 1),
-        fileFormat = jdbs[vu.mean].fileFormat(osKey, obsFKey))
+        fileFormat = fileFormat)
 
 
     #####################################################
@@ -204,6 +209,7 @@ class DiagnoseObsStatistics:
             varName,
             diagName, diagnosticConfig,
             binMethods,
+            fileFormat,
             logger,
           ))
         else:
@@ -214,6 +220,7 @@ class DiagnoseObsStatistics:
               varName,
               diagName, diagnosticConfig,
               binMethods,
+              fileFormat,
               logger,
             )
           ))
@@ -255,6 +262,15 @@ class DiagnoseObsStatistics:
     logger.info('Finished')
 
 
+  # (obsVarKey, metaKey) pairs: the vertical-level binVars for which named ranges in
+  # binning_utils.verticalBinFilters can drive collection-time aggregation, paired with the
+  # per-observation metadata alias used to look up each observation's actual value.
+  _verticalBinVarMeta = [
+    (vu.obsVarPrs, vu.prsMeta),
+    (vu.obsVarAlt, vu.altMeta),
+    (vu.obsVarImpact, vu.impactMeta),
+  ]
+
   #@staticmethod
   def _processBinMethods(self,
     dbVals,
@@ -262,6 +278,7 @@ class DiagnoseObsStatistics:
     varName,
     diagName, diagnosticConfig,
     binMethods,
+    fileFormat,
     logger,
   ):
 
@@ -282,6 +299,27 @@ class DiagnoseObsStatistics:
     for ss in su.allFileStats:
       statsDict[ss] = []
 
+    # Named vertical-level ranges (binning_utils.py's verticalBinFilters, scoped by
+    # verticalBinFilterVariables) let an obs-space diagnostic be aggregated over a sub-range of
+    # levels into a single bin, in addition to its normal 'full' (all-levels) treatment -- for
+    # contexts where the vertical binVar isn't itself a plot axis (e.g. LonLat2D maps). This only
+    # applies for whichever vertical binVar(s) this ObsSpace actually bins by (so its metadata was
+    # already read into dbVals) and is skipped for that same binVarKey (redundant with the
+    # existing plot-time trim in MultiDimBinMethodBase/BinValAxes2D).
+    maskedDiagnostics = {bu.blankBinFilterFile: diagValues}
+    levelResolvedBinVarKeys = set()
+    for obsVarKey, metaKey in self._verticalBinVarMeta:
+      levelRanges = bu.verticalRanges(obsVarKey)
+      if len(levelRanges) <= 1: continue
+      metaDbVar = vu.base2dbVar(metaKey, varName, fileFormat, outerIter)
+      metaVals = dbVals.get(metaDbVar)
+      if metaVals is None: continue
+
+      levelResolvedBinVarKeys.add(obsVarKey)
+      variants = bu.verticalRangeVariants(diagValues, metaVals, levelRanges, varName, obsVarKey)
+      for rangeName, values in variants.items():
+        maskedDiagnostics.setdefault(rangeName, values)
+
     for (binVarKey, binMethodName), binMethod in binMethods.items():
       if binMethod.excludeDiag(diagName): continue
       if binMethod.excludeVariable(varName): continue
@@ -296,30 +334,38 @@ class DiagnoseObsStatistics:
       binVarName, binGrpName = vu.splitObsVarGrp(binVarKey)
       binVarShort, binVarUnits = vu.varAttributes(binVarName)
 
-      binVals = binMethod.getvalues()
-      nBins = len(binVals)
-      for binVal in binVals:
-        # apply binMethod filters for binVal
-        binnedDiagnostic = binMethod.apply(diagValues, diagName, binVal)
+      applicableRanges = bu.applicableFilterRanges(binVarKey, levelResolvedBinVarKeys, maskedDiagnostics)
 
-        # store value and statistics associated with this bin
-        statsDict['binVal'].append(binVal)
-        statsVal = su.calcStats(binnedDiagnostic)
-        for statName in su.allFileStats:
-          statsDict[statName].append(statsVal[statName])
+      for rangeName in applicableRanges:
+        outputBinMethodName = bu.suffixedBinMethodName(binMethodName, rangeName)
+        theseDiagValues = maskedDiagnostics[rangeName]
 
-      #END binMethod.values LOOP
+        binVals = binMethod.getvalues()
+        nBins = len(binVals)
+        for binVal in binVals:
+          # apply binMethod filters for binVal
+          binnedDiagnostic = binMethod.apply(theseDiagValues, diagName, binVal)
 
-      # store metadata common to all bins
-      statsDict['DiagSpaceGrp'] += [ObsSpaceGrp]*nBins
-      statsDict['varName'] += [varShort]*nBins
-      statsDict['varUnits'] += [varUnits]*nBins
-      statsDict['diagName'] += [diagName]*nBins
-      statsDict['binMethod'] += [binMethodName]*nBins
-      statsDict['binVar'] += [binVarShort]*nBins
-      statsDict['binUnits'] += [binVarUnits]*nBins
+          # store value and statistics associated with this bin
+          statsDict['binVal'].append(binVal)
+          statsVal = su.calcStats(binnedDiagnostic)
+          for statName in su.allFileStats:
+            statsDict[statName].append(statsVal[statName])
 
-      logger.info('  completed '+varShort+', '+diagName+', '+binVarKey+', '+binMethodName)
+        #END binMethod.values LOOP
+
+        # store metadata common to all bins
+        statsDict['DiagSpaceGrp'] += [ObsSpaceGrp]*nBins
+        statsDict['varName'] += [varShort]*nBins
+        statsDict['varUnits'] += [varUnits]*nBins
+        statsDict['diagName'] += [diagName]*nBins
+        statsDict['binMethod'] += [outputBinMethodName]*nBins
+        statsDict['binVar'] += [binVarShort]*nBins
+        statsDict['binUnits'] += [binVarUnits]*nBins
+
+        logger.info('  completed '+varShort+', '+diagName+', '+binVarKey+', '+outputBinMethodName)
+
+      #END rangeName LOOP
 
     #END binMethods tuple LOOP
 

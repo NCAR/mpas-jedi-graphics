@@ -201,6 +201,28 @@ class BinValAxes2D(MultiDimBinMethodBase):
 
     def innerloops(self,
         dfwDict, diagnosticGroup, myLoc, statName, nVarsLoc, varMapLoc, myBinConfigs, options):
+        '''
+        Loop over named vertical-level filters (binning_utils.py's verticalBinFilters) for
+        whichever of the X/Y axes correspond to a filtered vertical binVar, e.g. ModelLatLev2D's Y
+        axis is vu.modVarLev. Usually just one 'full' (unfiltered) combination per axis, unless
+        additional named ranges are configured; each combination gets its own figure/filename.
+        '''
+        xBinVarKey, yBinVarKey = pconf.binVars2D[myLoc['binVar']]
+        xBinFiltersAll = bu.verticalRanges(xBinVarKey)
+        yBinFiltersAll = bu.verticalRanges(yBinVarKey)
+        if len(xBinFiltersAll) * len(yBinFiltersAll) > 1:
+            self.logger.info(myLoc['binVar']+': verticalBinFilters variants: x='+
+                              ','.join(xBinFiltersAll.keys())+' y='+','.join(yBinFiltersAll.keys()))
+        for xFilterName, xBinFilter in xBinFiltersAll.items():
+            for yFilterName, yBinFilter in yBinFiltersAll.items():
+                filterSuffix = self.binFilterFile(xFilterName)+self.binFilterFile(yFilterName)
+                self._innerloopsForFilter(
+                    dfwDict, diagnosticGroup, myLoc, statName, nVarsLoc, varMapLoc,
+                    myBinConfigs, options, xBinFilter, yBinFilter, filterSuffix)
+
+    def _innerloopsForFilter(self,
+        dfwDict, diagnosticGroup, myLoc, statName, nVarsLoc, varMapLoc, myBinConfigs, options,
+        xBinFilter, yBinFilter, filterSuffix):
 
         subplotWidth = options.get('subplotWidth', 3.5)
         subplotAspect = deepcopy(options.get('subplotAspect', 1.0))
@@ -234,6 +256,21 @@ class BinValAxes2D(MultiDimBinMethodBase):
 
         # parse comma-separated coordinates into a list of tuples
         binCoords = list([tuple(c.split(',')) for c in binCoordsLevels])
+
+        # apply the (already-selected) vertical-level filter for this X/Y filter combination.
+        # Mirrors the same binFilter mechanism used for single-axis (profile/series) plots
+        # in MultiDimBinMethodBase.
+        if xBinFilter or yBinFilter:
+            xNum = np.asarray([float(c[0]) for c in binCoords])
+            yNum = np.asarray([float(c[1]) for c in binCoords])
+            remove = self.maskByBinFilter(xNum, xBinFilter) | self.maskByBinFilter(yNum, yBinFilter)
+            if np.any(remove):
+                binCoordsLevels = list(np.asarray(binCoordsLevels)[~remove])
+                binCoords = list(np.asarray(binCoords, dtype=object)[~remove])
+                binCoords = [tuple(c) for c in binCoords]
+        if len(binCoords) == 0:
+            self.logger.warning(myLoc['binVar']+': all binVals removed by verticalBinFilters; skipping')
+            return
 
         # unzip binCoords into independent X tuple and Y tuple
         xCoords, yCoords = zip(*binCoords)
@@ -640,10 +677,10 @@ class BinValAxes2D(MultiDimBinMethodBase):
                         self.logger.info('\nfit2D L2 norms: '+str(L2Norms))
                         self.logger.info('\nfit2D count-weighted L2 norms: '+str(weightedL2Norms))
 
-                        filename = ('%s_%s_fit2D_%s_%s_%s%s_%smin'%(
+                        filename = ('%s_%s_fit2D_%s_%s_%s%s%s_%smin'%(
                                    varName, expFileName,
                                    myLoc['binVar'], diagnosticGroup, statName,
-                                   self.binMethodFile(myLoc['binMethod']),
+                                   self.binMethodFile(myLoc['binMethod']), filterSuffix,
                                    fcTDelta_totmin))
 
                         pu.finalize_fig(fitFig, str(figPath/filename), self.figureFileType, self.interiorLabels, 0.6)
@@ -671,10 +708,10 @@ class BinValAxes2D(MultiDimBinMethodBase):
                             1, 2, 2, 1,
                             interiorLabels=True)
 
-                        filename = ('%s_%s_L-Curves_%s_%s_%s%s_%smin'%(
+                        filename = ('%s_%s_L-Curves_%s_%s_%s%s%s_%smin'%(
                                    varName, expFileName,
                                    myLoc['binVar'], diagnosticGroup, statName,
-                                   self.binMethodFile(myLoc['binMethod']),
+                                   self.binMethodFile(myLoc['binMethod']), filterSuffix,
                                    fcTDelta_totmin))
 
                         pu.finalize_fig(LFig, str(figPath/filename), self.figureFileType, True, 0.6)
@@ -734,9 +771,9 @@ class BinValAxes2D(MultiDimBinMethodBase):
                     iplot = iplot + 1
 
             # save each figure
-            filename = ('%s%s_BinValAxes2D_%smin_%s_%s_%s'%(
+            filename = ('%s%s%s_BinValAxes2D_%smin_%s_%s_%s'%(
                        myLoc['binVar'],
-                       self.binMethodFile(myLoc['binMethod']),
+                       self.binMethodFile(myLoc['binMethod']), filterSuffix,
                        fcTDelta_totmin, self.DiagSpaceName,
                        diagnosticGroup, statName))
 
@@ -748,9 +785,10 @@ class BinValAxes2D(MultiDimBinMethodBase):
             self.write_figure_yaml(figureData, dataPath, filename)
 
             for region_name, zoom in zoomed_figs.items():
-                zoom_filename = ('%s%s_BinValAxes2D_%smin_%s_%s_%s'%(
+                zoom_filename = ('%s%s%s%s_BinValAxes2D_%smin_%s_%s_%s'%(
                                myLoc['binVar'],
-                               self.binMethodFile(region_name),
+                               self.binMethodFile(myLoc['binMethod']),
+                               self.binMethodFile(region_name), filterSuffix,
                                fcTDelta_totmin, self.DiagSpaceName,
                                diagnosticGroup, statName))
                 pu.finalize_fig(
@@ -769,10 +807,10 @@ class BinValAxes2D(MultiDimBinMethodBase):
                     for degree, e2 in e1.items():
                         degStr = str(degree)
                         self.logger.info('\n '+expName+', degree: '+degStr)
-                        filename = ('%s_degree=%s_fit2D_%s_%s_%s%s_%smin_%s.yaml'%(
+                        filename = ('%s_degree=%s_fit2D_%s_%s_%s%s%s_%smin_%s.yaml'%(
                                    expFileName, degStr,
                                    myLoc['binVar'], diagnosticGroup, statName,
-                                   self.binMethodFile(myLoc['binMethod']),
+                                   self.binMethodFile(myLoc['binMethod']), filterSuffix,
                                    fcTDelta_totmin, self.DiagSpaceName))
 
                         fn = str(figPath/filename)
@@ -782,7 +820,7 @@ class BinValAxes2D(MultiDimBinMethodBase):
                           'Terms',
                           self.DiagSpaceName,
                           'degree'+degStr+':',
-                          '&'+self.DiagSpaceName+'_fit2D_'+myLoc['binVar']+self.binMethodFile(myLoc['binMethod'])+'_degree'+degStr,
+                          '&'+self.DiagSpaceName+'_fit2D_'+myLoc['binVar']+self.binMethodFile(myLoc['binMethod'])+filterSuffix+'_degree'+degStr,
                         ]
                         with open(fn, 'w') as file:
                           file.write(' '.join(anchorKeyParts)+'\n')

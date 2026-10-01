@@ -155,8 +155,6 @@ class PlotModelSpread():
       for ee, ensembleState in enumerate(['b', 'a', 'inf']):
         diagName = 'sigmax'+ensembleState
 
-        modelVarName = mu.aggModelVariable(varName)
-
         diagFunction = mu.diagnosticFunctions[diagName]
         diagnostic = diagFunction.evaluate(varName, fieldsDB)
 
@@ -170,7 +168,7 @@ class PlotModelSpread():
 
         sigmax[ensembleState] = np.full(nn, np.nan)
 
-        for lev in np.arange(0, mu.aggMaxLevel(varName, nn)):
+        for lev in np.arange(0, nn):
           if nDims==2:
             sigmax[ensembleState][lev] = RMS(diagnostic[:,lev])
           else:

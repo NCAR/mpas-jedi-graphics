@@ -94,7 +94,7 @@ class CYAxisFCLines(CategoryBinMethodBase):
                         if self.fcTDeltas.index(fcTDelta) > (self.MAX_FC_LINES-1): continue
 
                         self.fcTDeltas_labels.append(
-                            pu.timeDeltaTicks([fcTDelta.total_seconds()]))
+                            pu.timeDeltaTickLabels(fcTDelta.total_seconds(), None))
 
                         lineCYDTimes = dfwDict['dfw'].levels('cyDTime', lineLoc)
 
@@ -119,7 +119,7 @@ class CYAxisFCLines(CategoryBinMethodBase):
                     subplotData['title'] = title
                     subplotData['dmin'] = self.dataYAMLFmtFloat(dmin)
                     subplotData['dmax'] = self.dataYAMLFmtFloat(dmax)
-                    subplotData['linesLabel'] = [self.dataYAMLFmtFloat(l[0]) for l in self.fcTDeltas_labels]
+                    subplotData['linesLabel'] = list(self.fcTDeltas_labels)
                     subplotData['xsVals'] = [
                         [t.isoformat() for t in xVals]
                         for xVals in xsVals[:len(linesVals)]

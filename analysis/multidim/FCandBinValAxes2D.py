@@ -255,8 +255,9 @@ class FCandBinValAxes2D(MultiDimBinMethodBase):
                 iplot = iplot + 1
 
         # save figure
-        filename = ('%s%s_BinValAxisTSeries_%s-%smin_%s_%s_%s'%(
+        filename = ('%s%s%s_BinValAxisTSeries_%s-%smin_%s_%s_%s'%(
                    myLoc['binVar'], self.binMethodFile(myLoc['binMethod']),
+                   self.binFilterFile(myLoc['binFilterName']),
                    self.fcTDeltas_totmin[0], self.fcTDeltas_totmin[-1],
                    self.DiagSpaceName, fcDiagName, statName))
 

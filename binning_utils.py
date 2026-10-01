@@ -44,6 +44,178 @@ alt_jet_val = '{:.0f}'.format(0.5 * (alt_jet_min + alt_jet_max))
 altjetMethod = 'alt='+alt_jet_val+'m'
 impactjetMethod = 'alt='+alt_jet_val+'m'
 
+#===========================
+# named vertical-level ranges
+#===========================
+# name treated as the unfiltered/default vertical-level range; never appears in output
+# filenames/titles/binMethod suffixes (see MultiDimBinMethodBase.binFilterFile() and
+# DiagnoseModelStatistics.py's use of this constant)
+blankBinFilterFile = 'full'
+
+# Named vertical-level subranges, per vertical bin variable. Each vertical binVar maps to a dict of
+# NAMED subranges; each named subrange is itself a dict that may contain 'minvalue' and/or 'maxvalue':
+#   + both minvalue and maxvalue -> that range
+#   + minvalue == maxvalue       -> a single level
+#   + only one of the two        -> clip only that end, leaving the other open
+#
+# Every vertical binVar also always gets the unrestricted 'full' range (blankBinFilterFile), which
+# is added by verticalRanges() below and is not listed here. 'full' never adds a suffix to output
+# filenames (matching how the default binMethod is left off filenames). Any other name (e.g. 'jet')
+# is appended to filenames/titles as '_<name>'. To disable subranges for one binVar, remove its
+# entry; to disable them for all binVars, set verticalBinFilters = {}.
+#
+# These ranges are NOT tied to any specific diagnosed variable -- they apply to whichever variable
+# is plotted/aggregated against these binVars -- which is why they live here rather than var_utils.py.
+#
+# Two independent consumers:
+#  + MultiDimBinMethodBase/BinValAxes2D trim an already-computed, per-level-resolved plot axis to a
+#    named range, preserving per-level resolution within it.
+#  + DiagnoseModelStatistics.py aggregates each non-'full' named range into a single Count/Mean/
+#    RMS/STD bin, tagged via a suffixed binMethod name, for contexts where the vertical binVar isn't
+#    itself a plot axis (e.g. domain-wide/regional time series). This generalizes what used to be a
+#    qv-specific mechanism (modelsp_utils.py's aggregatedVariableConfig, which faked variable names
+#    like 'qv01to10') to apply uniformly to any level-resolved variable, driven by this dict instead
+#    of hand-duplicated per-variable code. Because vu.modVarLev's ranges are shared with the
+#    plot-time-trim consumer above, adding a range here also produces trimmed profile-plot variants
+#    for every model variable binned by vu.modVarLev, not just the one(s) the aggregate mechanism
+#    cares about -- that is intentional.
+verticalBinFilters = {
+  # vu.obsVarAlt/vu.obsVarImpact units are meters
+  # 'jet' reproduces the jet-stream altitude band formerly hardcoded into the now-removed
+  # altjetMethod/impactjetMethod binMethod entries under vu.obsVarLat in predefined_configs.py
+  # (see config.py's gnssro binVarConfigs) -- this generic mechanism now produces the equivalent
+  # '<binMethod>_jet' suffixed output for whatever plain binMethod is registered there instead.
+  vu.obsVarAlt:     {
+      'jet':  {'minvalue': alt_jet_min, 'maxvalue': alt_jet_max},
+  },
+  vu.obsVarImpact:  {
+      'jet':  {'minvalue': alt_jet_min, 'maxvalue': alt_jet_max},
+  },
+  # vu.obsVarPrs units are hPa. 'jet' reproduces the jet-stream pressure band formerly hardcoded
+  # into the now-removed PjetMethod binMethod entry under vu.obsVarLat (see config.py's
+  # profilePressureBinVars) -- see comment above.
+  vu.obsVarPrs:     {
+      'jet':  {'minvalue': P_jet_min, 'maxvalue': P_jet_max},
+  },
+  # vu.modVarLev is a dimensionless model-level index; these ranges reproduce (generically) what
+  # was previously only available for qv via modelsp_utils.py's aggregatedVariableConfig
+  vu.modVarLev:     {
+      'L01to30' : {'maxvalue': 30},
+      'L01to10' : {'minvalue': 1,  'maxvalue': 10},
+      'L11to20' : {'minvalue': 11, 'maxvalue': 20},
+      'L21to30' : {'minvalue': 21, 'maxvalue': 30},
+      'L31to40' : {'minvalue': 31, 'maxvalue': 40},
+      'L41to55' : {'minvalue': 41, 'maxvalue': 55},
+  },
+}
+
+def verticalRanges(binVarKey):
+  '''
+  All named vertical-level ranges for binVarKey: the unrestricted 'full' range
+  (blankBinFilterFile) first, followed by any named subranges in verticalBinFilters[binVarKey].
+  '''
+  return {blankBinFilterFile: {}, **verticalBinFilters.get(binVarKey, {})}
+
+# Flat, cross-binVar union of every named vertical-level range (excluding blankBinFilterFile).
+# Used by CategoryBinMethodBase to discover collection-time-aggregated binMethod rows tagged via
+# suffixedBinMethodName() below (e.g. 'identity_L01to10'), since that suffix convention does not
+# itself encode which vertical binVar produced the range.
+allVerticalRangeNames = sorted({
+    name for filters in verticalBinFilters.values()
+    for name in filters if name != blankBinFilterFile
+})
+
+# Optional per-variable allowlist restricting which variables the COLLECTION-TIME aggregate
+# mechanism (DiagnoseModelStatistics.py/DiagnoseObsStatistics.py, via verticalRangeVariants()
+# below) runs its named ranges for. Keyed the same way as verticalBinFilters above. A binVarKey
+# with no entry here is unrestricted (every variable binned by it gets every named range); an
+# entry restricts to just the listed variable names (the same varName values passed to
+# binMethod.excludeVariable/evaluate).
+#
+# This does NOT affect the plot-time axis trim (MultiDimBinMethodBase/BinValAxes2D) -- that's
+# already cheap (it subsets already-computed rows) and variable-agnostic by construction. The
+# collection-time mechanism is the expensive one: it reruns every eligible binMethod once per
+# named range per variable, so an unrestricted vu.modVarLev range set multiplies the cost of
+# every level-indexed model variable, not just the ones you actually want the range-aggregated
+# stats for. Default to just 'qv', matching the qv-specific mechanism this generalizes (see
+# verticalBinFilters[vu.modVarLev] above); add more names, or clear the set, to widen it.
+verticalBinFilterVariables = {
+  vu.modVarLev: {'qv'},
+}
+
+def maskByRange(numVals, namedRange):
+  '''
+  Given an array-like of numeric values and a namedRange dict with optional 'minvalue'/'maxvalue'
+  keys (see verticalBinFilters above), return a boolean mask that is True where the value is
+  OUTSIDE the range (i.e. should be removed/excluded; keep numVals[~mask]). Shared by the
+  plot-time trim (MultiDimBinMethodBase.maskByBinFilter/BinValAxes2D) and the collection-time
+  aggregate mechanism (DiagnoseModelStatistics.py).
+  '''
+  numVals = np.asarray(numVals)
+  remove = np.full_like(numVals, False, bool)
+  if not namedRange:
+    return remove
+  minvalue = namedRange.get('minvalue', None)
+  if minvalue is not None:
+    remove[lessBound(numVals, minvalue)] = True
+  maxvalue = namedRange.get('maxvalue', None)
+  if maxvalue is not None:
+    remove[greatBound(numVals, maxvalue)] = True
+  return remove
+
+def verticalRangeVariants(diagValues, coordVals, levelRanges, varName, binVarKey, axis=None):
+  '''
+  Build named masked variants of diagValues for the collection-time vertical-level-range
+  aggregation mechanism (DiagnoseModelStatistics.py/DiagnoseObsStatistics.py). Always returns
+  a dict starting with {blankBinFilterFile: diagValues} (the input unchanged); adds one entry
+  per additional named range in levelRanges, each a copy of diagValues with out-of-range
+  coordVals masked to NaN, UNLESS levelRanges has only the default 'full' entry or varName is
+  excluded by verticalBinFilterVariables[binVarKey] (see above).
+
+  coordVals gives, for each position along `axis` of diagValues (or each element of diagValues
+  itself when axis is None), the numeric value to test against each named range -- e.g. model
+  level index (model, axis=1: one coordVal per column) or per-observation metadata (obs,
+  axis=None: one coordVal per element).
+  '''
+  maskedDiagnostics = {blankBinFilterFile: diagValues}
+  if len(levelRanges) <= 1:
+    return maskedDiagnostics
+  allowedVars = verticalBinFilterVariables.get(binVarKey)
+  if allowedVars is not None and varName not in allowedVars:
+    return maskedDiagnostics
+  for rangeName, namedRange in levelRanges.items():
+    if rangeName == blankBinFilterFile: continue
+    mask = maskByRange(coordVals, namedRange)
+    masked = diagValues.copy()
+    if axis is None:
+      masked[mask] = np.nan
+    else:
+      index = [slice(None)] * masked.ndim
+      index[axis] = mask
+      masked[tuple(index)] = np.nan
+    maskedDiagnostics[rangeName] = masked
+  return maskedDiagnostics
+
+def applicableFilterRanges(binVarKey, levelResolvedBinVarKeys, maskedDiagnostics):
+  '''
+  Named ranges (keys of maskedDiagnostics, see verticalRangeVariants above) that should be
+  aggregated separately for this binVarKey: all of them, unless binVarKey is itself one of the
+  already-level-resolved binVarKeys (redundant with the plot-time axis trim), in which case only
+  the unfiltered 'full' variant applies.
+  '''
+  if binVarKey in levelResolvedBinVarKeys:
+    return [blankBinFilterFile]
+  return list(maskedDiagnostics.keys())
+
+def suffixedBinMethodName(binMethodName, rangeName):
+  '''
+  Mirrors MultiDimBinMethodBase.binFilterFile(): tag a collection-time binMethod name with the
+  named vertical-level-range it was aggregated over, unless it's the default/unfiltered range.
+  '''
+  if rangeName == blankBinFilterFile:
+    return binMethodName
+  return binMethodName+'_'+rangeName
+
 #LocalHour
 LH0  = 0.0
 LH1  = 23.0

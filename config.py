@@ -58,8 +58,9 @@ surfBinVars[vu.obsVarLat] += [bu.latbandsMethod]
 profilePressureBinVars = deepcopy(obsBinVars)
 profilePressureBinVars[vu.obsVarPrs] += [bu.identityBinMethod, bu.PjetMethod]
 profilePressureBinVars[vu.obsVarLat] += [bu.latbandsMethod]
-# priority 2
-profilePressureBinVars[vu.obsVarLat] += [bu.PjetMethod]
+# jet-stream-band-restricted latbandsMethod variant is produced automatically by the
+# collection-time vertical-level-range aggregation, driven by the 'jet' named range in
+# binning_utils.verticalBinFilters[vu.obsVarPrs] -- see binning_utils.py
 
 # pseudo-2D pressure bins with named latitude-band methods
 # priority 1
@@ -97,10 +98,12 @@ gnssrobndBinVars = deepcopy(gnssroBinVars)
 ## priority 1
 # pseudo altitude bins
 gnssrorefBinVars[vu.obsVarAlt] += [bu.identityBinMethod, bu.altjetMethod]
-gnssrorefBinVars[vu.obsVarLat] += [bu.altjetMethod]
+# jet-stream-band-restricted polarlatbandsMethod variant is produced automatically by the
+# collection-time vertical-level-range aggregation, driven by the 'jet' named range in
+# binning_utils.verticalBinFilters[vu.obsVarAlt] -- see binning_utils.py
 
 gnssrobndBinVars[vu.obsVarImpact] += [bu.identityBinMethod, bu.altjetMethod]
-gnssrobndBinVars[vu.obsVarLat] += [bu.impactjetMethod]
+# ditto, driven by binning_utils.verticalBinFilters[vu.obsVarImpact]
 
 # pseudo-2D altitude bins with named latitude-band methods
 for latBand in pconf.namedPolarLatBands['values']:
@@ -885,16 +888,13 @@ DiagSpaceConfig = {
         #'analyzed variables': [
         #  'T2m', 'Q2m', 'U10m', 'V10m', 'Ps',
         #  'T', 'Theta', 'Qv', 'U', 'V', 'P', 'rho', 'W',
-        # 'Qv01to10', 'Qv11to20','Qv21to30','Qv31to40','Qv41to55',
         #],
-        ## all standard variables + Qv by levels
+        ## all standard variables (Qv's L01to10/L11to20/etc. named level ranges from
+        ## binning_utils.py's verticalBinFilters[vu.modVarLev] show up as distinct binMethod
+        ## values for 'Qv', not as separate entries here -- see noBinVar/modVarLat plots)
         'analyzed variables': [
           'T2m', 'Q2m', 'U10m', 'Ps',
           'T',  'Qv', 'U', 'V',
-          'Qv01to10',
-          'Qv11to20',
-          'Qv21to30',
-          'Qv31to40',
         ],
         ## specific standard variables
         #'analyzed variables': [
@@ -908,14 +908,6 @@ DiagSpaceConfig = {
         ## all standard 3D
         #'analyzed variables': [
         #  'T', 'Theta', 'Qv', 'U', 'V', 'P', 'rho', 'W',
-        #],
-        ## special Qv
-        #'analyzed variables': [
-        #  'Qv01to10',
-        #  'Qv11to20',
-        #  'Qv21to30',
-        #  'Qv31to40',
-        #  'Qv41to55',
         #],
     },
 }
