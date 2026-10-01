@@ -35,11 +35,11 @@ class MultiDimBinMethodBase(AnalysisBase):
         self.binVarDict = {
             vu.obsVarAlt: {
               'profilefunc': bpf.plotProfile,
-              'binFilters': bu.verticalBinFilters.get(vu.obsVarAlt, {self.blankBinFilterFile: {}}),
+              'binFilters': bu.verticalRanges(vu.obsVarAlt),
             },
             vu.obsVarImpact: {
               'profilefunc': bpf.plotProfile,
-              'binFilters': bu.verticalBinFilters.get(vu.obsVarImpact, {self.blankBinFilterFile: {}}),
+              'binFilters': bu.verticalRanges(vu.obsVarImpact),
             },
             vu.obsVarACI: {'profilefunc': bpf.plotSeries, 'binVarTier': 3},
             vu.obsVarCldFracX: {'profilefunc': bpf.plotSeries, 'binVarTier': 2},
@@ -47,19 +47,19 @@ class MultiDimBinMethodBase(AnalysisBase):
             vu.obsVarLat: {'profilefunc': bpf.plotProfile},
             vu.obsVarPrs: {
               'profilefunc': bpf.plotProfile,
-              'binFilters': bu.verticalBinFilters.get(vu.obsVarPrs, {self.blankBinFilterFile: {}}),
+              'binFilters': bu.verticalRanges(vu.obsVarPrs),
             },
             vu.obsVarCI: {'profilefunc': bpf.plotSeries, 'binVarTier': 2},
             vu.obsVarLogCI: {'profilefunc': bpf.plotSeries, 'binVarTier': 3},
             vu.modVarDiagPrs: {
               'profilefunc': bpf.plotProfile,
-              'binFilters': bu.verticalBinFilters.get(vu.modVarDiagPrs, {self.blankBinFilterFile: {}}),
+              'binFilters': bu.verticalRanges(vu.modVarDiagPrs),
             },
             # vu.modVarLat is redundant with vu.obsVarLat (both have varShort=="lat")
             #vu.modVarLat: {'profilefunc': bpf.plotProfile, 'binVarTier': 1},
             vu.modVarLev: {
               'profilefunc': bpf.plotProfile,
-              'binFilters': bu.verticalBinFilters.get(vu.modVarLev, {self.blankBinFilterFile: {}}),
+              'binFilters': bu.verticalRanges(vu.modVarLev),
             },
             vu.obsVarGlint: {'profilefunc': bpf.plotSeries, 'binVarTier': 3},
             vu.obsVarLandFrac: {'profilefunc': bpf.plotSeries, 'binVarTier': 3},

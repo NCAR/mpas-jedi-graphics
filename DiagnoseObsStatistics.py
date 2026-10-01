@@ -309,7 +309,7 @@ class DiagnoseObsStatistics:
     maskedDiagnostics = {bu.blankBinFilterFile: diagValues}
     levelResolvedBinVarKeys = set()
     for obsVarKey, metaKey in self._verticalBinVarMeta:
-      levelRanges = bu.verticalBinFilters.get(obsVarKey, {bu.blankBinFilterFile: {}})
+      levelRanges = bu.verticalRanges(obsVarKey)
       if len(levelRanges) <= 1: continue
       metaDbVar = vu.base2dbVar(metaKey, varName, fileFormat, outerIter)
       metaVals = dbVals.get(metaDbVar)

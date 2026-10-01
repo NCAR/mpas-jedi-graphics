@@ -208,8 +208,8 @@ class BinValAxes2D(MultiDimBinMethodBase):
         additional named ranges are configured; each combination gets its own figure/filename.
         '''
         xBinVarKey, yBinVarKey = pconf.binVars2D[myLoc['binVar']]
-        xBinFiltersAll = bu.verticalBinFilters.get(xBinVarKey, {self.blankBinFilterFile: {}})
-        yBinFiltersAll = bu.verticalBinFilters.get(yBinVarKey, {self.blankBinFilterFile: {}})
+        xBinFiltersAll = bu.verticalRanges(xBinVarKey)
+        yBinFiltersAll = bu.verticalRanges(yBinVarKey)
         if len(xBinFiltersAll) * len(yBinFiltersAll) > 1:
             self.logger.info(myLoc['binVar']+': verticalBinFilters variants: x='+
                               ','.join(xBinFiltersAll.keys())+' y='+','.join(yBinFiltersAll.keys()))

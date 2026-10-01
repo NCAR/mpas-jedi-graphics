@@ -52,16 +52,17 @@ impactjetMethod = 'alt='+alt_jet_val+'m'
 # DiagnoseModelStatistics.py's use of this constant)
 blankBinFilterFile = 'full'
 
-# Named vertical-level ranges, per vertical bin variable. Each vertical binVar maps to a dict of
-# NAMED ranges; each named range is itself a dict that may contain 'minvalue' and/or 'maxvalue':
+# Named vertical-level subranges, per vertical bin variable. Each vertical binVar maps to a dict of
+# NAMED subranges; each named subrange is itself a dict that may contain 'minvalue' and/or 'maxvalue':
 #   + both minvalue and maxvalue -> that range
 #   + minvalue == maxvalue       -> a single level
 #   + only one of the two        -> clip only that end, leaving the other open
-#   + neither (empty dict {})    -> the full range, no restriction
 #
-# 'full' is the name for the whole range (no restriction) -- it never adds a suffix to output
-# filenames (matching how the default binMethod is left off filenames). Any other name (e.g. 'trop')
-# is appended to filenames/titles as '_<name>'.
+# Every vertical binVar also always gets the unrestricted 'full' range (blankBinFilterFile), which
+# is added by verticalRanges() below and is not listed here. 'full' never adds a suffix to output
+# filenames (matching how the default binMethod is left off filenames). Any other name (e.g. 'jet')
+# is appended to filenames/titles as '_<name>'. To disable subranges for one binVar, remove its
+# entry; to disable them for all binVars, set verticalBinFilters = {}.
 #
 # These ranges are NOT tied to any specific diagnosed variable -- they apply to whichever variable
 # is plotted/aggregated against these binVars -- which is why they live here rather than var_utils.py.
@@ -85,28 +86,20 @@ verticalBinFilters = {
   # (see config.py's gnssro binVarConfigs) -- this generic mechanism now produces the equivalent
   # '<binMethod>_jet' suffixed output for whatever plain binMethod is registered there instead.
   vu.obsVarAlt:     {
-      'full': {'maxvalue': 30000.},
       'jet':  {'minvalue': alt_jet_min, 'maxvalue': alt_jet_max},
   },
   vu.obsVarImpact:  {
-      'full': {'maxvalue': 30000.},
       'jet':  {'minvalue': alt_jet_min, 'maxvalue': alt_jet_max},
   },
   # vu.obsVarPrs units are hPa. 'jet' reproduces the jet-stream pressure band formerly hardcoded
   # into the now-removed PjetMethod binMethod entry under vu.obsVarLat (see config.py's
   # profilePressureBinVars) -- see comment above.
   vu.obsVarPrs:     {
-      'full': {},
       'jet':  {'minvalue': P_jet_min, 'maxvalue': P_jet_max},
   },
-  # vu.modVarDiagPrs is actually hPa, not Pa as this comment previously claimed --
-  # modelsp_utils.diagnosticPressures = [50,100,200,250,500,700,850,925] (its own comment says
-  # "diagnostic pressures (hPa)").
-  vu.modVarDiagPrs: {'full': {}},
   # vu.modVarLev is a dimensionless model-level index; these ranges reproduce (generically) what
   # was previously only available for qv via modelsp_utils.py's aggregatedVariableConfig
   vu.modVarLev:     {
-      'full'    : {},
       'L01to30' : {'maxvalue': 30},
       'L01to10' : {'minvalue': 1,  'maxvalue': 10},
       'L11to20' : {'minvalue': 11, 'maxvalue': 20},
@@ -115,6 +108,13 @@ verticalBinFilters = {
       'L41to55' : {'minvalue': 41, 'maxvalue': 55},
   },
 }
+
+def verticalRanges(binVarKey):
+  '''
+  All named vertical-level ranges for binVarKey: the unrestricted 'full' range
+  (blankBinFilterFile) first, followed by any named subranges in verticalBinFilters[binVarKey].
+  '''
+  return {blankBinFilterFile: {}, **verticalBinFilters.get(binVarKey, {})}
 
 # Flat, cross-binVar union of every named vertical-level range (excluding blankBinFilterFile).
 # Used by CategoryBinMethodBase to discover collection-time-aggregated binMethod rows tagged via

@@ -272,7 +272,7 @@ class DiagnoseModelStatistics():
         isModelLevelIndexed = nDims == 2 and varName not in vu.modDiagnosticVarNames
 
         if isModelLevelIndexed:
-          levelRanges = bu.verticalBinFilters.get(vu.modVarLev, {bu.blankBinFilterFile: {}})
+          levelRanges = bu.verticalRanges(vu.modVarLev)
           maskedDiagnostics = bu.verticalRangeVariants(
             diagnostic, dbValsNN[vu.modVarLev], levelRanges, varName, vu.modVarLev, axis=1)
         else:
