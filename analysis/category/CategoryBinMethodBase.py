@@ -154,10 +154,7 @@ class CategoryBinMethodBase(AnalysisBase):
 
     def innerloopsWrapper(self,
         diagnosticGroup, diagnosticConfigs, fullBinVar, binMethod, selectedStatistics, options,
-        filterName = None):
-
-        if filterName is None:
-            filterName = bu.blankBinFilterFile
+        filterName):
 
         binVar = vu.varDictAll.get(fullBinVar, [None, fullBinVar])[1]
 

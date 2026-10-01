@@ -159,12 +159,7 @@ class MultiDimBinMethodBase(AnalysisBase):
 
     def innerloopsWrapper(self,
         diagnosticGroup, diagnosticConfigs, binVar, binMethod, selectedStatistics, options,
-        filterName = None, binFilter = None):
-
-        if filterName is None:
-            filterName = self.blankBinFilterFile
-        if binFilter is None:
-            binFilter = {}
+        filterName, binFilter):
 
         myLoc = {}
         myLoc['binVar'] = binVar
