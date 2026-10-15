@@ -744,8 +744,7 @@ def plotSeries(fig,
 
     # add horizontal centralValue line for unbounded quantities
     if centralValue is not None:
-        ax.plot([xVals[0], xVals[-1]], [centralValue, centralValue], ls="--", c=".3",
-            linewidth=0.7,markersize=0)
+        ax.axhline(centralValue, ls="--", c=".3", linewidth=0.7)
 
     # standardize data-limits
     mindval, maxdval = pu.get_clean_ax_limits(dmin, dmax, plotVals, centralValue)
@@ -1026,8 +1025,7 @@ def plotProfile(fig,
 
     # add vertical centralValue line for unbounded quantities
     if centralValue is not None:
-        ax.plot([centralValue, centralValue], [yVals[0], yVals[-1]], ls="--", c=".3",
-            linewidth=0.7,markersize=0)
+        ax.axvline(centralValue, ls="--", c=".3", linewidth=0.7)
 
     # standardize data-limits
     mindval, maxdval = pu.get_clean_ax_limits(dmin, dmax, plotVals, centralValue)
@@ -1203,7 +1201,6 @@ def plotTimeSeries(fig,
     #add lines
     plotVals = np.asarray([])
     nLines = 0
-    jline = 0
     for iline, lineVals in enumerate(linesVals):
         if np.all(np.isnan(lineVals)):
             global nanWarnTS
@@ -1224,14 +1221,6 @@ def plotTimeSeries(fig,
                 _logger.warning(f"skipping data where len(x)!=len(y): {title}; {dataLabel}; {linesLabel[iline]}")
             lenWarnTS=lenWarnTS+1
             continue
-
-        if jline == 0:
-            minX = xVals[0]
-            maxX = xVals[-1]
-        else:
-            minX = min([xVals[0], minX])
-            maxX = max([xVals[-1], maxX])
-        jline += 1
 
         # Plot line for each lineVals that has non-missing data
         pColor = pstyle.color(iline+lineAttribOffset)
@@ -1323,8 +1312,7 @@ def plotTimeSeries(fig,
 
     # add horizontal centralValue line for unbounded quantities
     if centralValue is not None:
-        ax.plot([minX, maxX], [centralValue, centralValue], ls="--", c=".3",
-            linewidth=0.7,markersize=0)
+        ax.axhline(centralValue, ls="--", c=".3", linewidth=0.7)
 
     #axes settings
     if isinstance(xsDates[0], Iterable):
