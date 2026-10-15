@@ -501,6 +501,18 @@ diagnosticGroupings['CRy'] = ['CRyb', 'CRya']
 #diagnosticGroupings['SRx'] = ['SRx-eda', 'SRx-rtpp']
 
 
+## ================================================================================================
+## ---------------------------------------------------
+## Vertical level filtering for profile/2D/series plots
+## ---------------------------------------------------
+# Named vertical-level ranges used to filter profile/2D/series plots to a sub-range of levels
+# are configured in binning_utils.verticalBinFilters -- edit that
+# dict, not this file, to add or change a named range. It lives there (not here, and not in
+# var_utils.py) because it also needs to be importable by the collection scripts
+# (DiagnoseModelStatistics.py etc.), which never import analyze_config.py, and because these
+# ranges are not tied to any specific diagnosed variable.
+
+
 ########################################################################
 ## Configure the analysisTypes to apply to the statistics
 #  - below are recommendations for single/multiple forecast lengths

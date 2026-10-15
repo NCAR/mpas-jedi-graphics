@@ -112,25 +112,49 @@ class CategoryBinMethodBase(AnalysisBase):
             diagLoc = {'diagName': diagnosticNames}
             diagBinVars = self.db.dfw.levels('binVar', diagLoc)
             diagBinMethods = self.db.dfw.levels('binMethod', diagLoc)
-            for (fullBinVar, binMethod), options in self.binVarDict.items():
+            for (fullBinVar, baseBinMethod), options in self.binVarDict.items():
                 if options.get('binVarTier', 1) > self.maxBinVarTier: continue
                 binVar = vu.varDictAll.get(fullBinVar, [None, fullBinVar])[1]
                 if binVar not in diagBinVars: continue
-                if binMethod is not None and binMethod not in diagBinMethods:
-                    self.logger.warning(diagnosticGroup+': binVar='+binVar+', binMethod='+str(binMethod)+' not in database; skipping')
+
+                variants = list(self.binMethodVariants(baseBinMethod, diagBinMethods))
+                if not variants:
+                    self.logger.warning(diagnosticGroup+': binVar='+binVar+', binMethod='+str(baseBinMethod)+' not in database; skipping')
                     continue
 
-                self.logger.info(diagnosticGroup+', '+binVar+', '+str(binMethod))
+                for filterName, binMethod in variants:
+                    self.logger.info(diagnosticGroup+', '+binVar+', '+str(binMethod))
 
-                if useWorkers:
-                    workers.apply_async(self.innerloopsWrapper,
-                        args = (diagnosticGroup, diagnosticConfigs, fullBinVar, binMethod, selectedStatistics, options))
-                else:
-                    self.innerloopsWrapper(
-                        diagnosticGroup, diagnosticConfigs, fullBinVar, binMethod, selectedStatistics, options)
+                    if useWorkers:
+                        workers.apply_async(self.innerloopsWrapper,
+                            args = (diagnosticGroup, diagnosticConfigs, fullBinVar, binMethod, selectedStatistics, options, filterName))
+                    else:
+                        self.innerloopsWrapper(
+                            diagnosticGroup, diagnosticConfigs, fullBinVar, binMethod, selectedStatistics, options, filterName)
+
+    def binMethodVariants(self, baseBinMethod, diagBinMethods):
+        '''
+        Yield (filterName, binMethod) pairs for a declared base binMethod: the bare name itself
+        (filterName=bu.blankBinFilterFile) when present in diagBinMethods, plus one entry per
+        named vertical-level range (binning_utils.py's verticalBinFilters) whose suffixed variant
+        (bu.suffixedBinMethodName(baseBinMethod, rangeName)) is present. Mirrors how
+        MultiDimBinMethodBase discovers/loops named ranges, generalized to the compound-binMethod-
+        name convention used by the collection-time aggregation mechanism
+        (DiagnoseModelStatistics.py/DiagnoseObsStatistics.py) instead of a numeric plot-axis trim.
+        '''
+        if baseBinMethod is None:
+            yield bu.blankBinFilterFile, baseBinMethod
+            return
+        if baseBinMethod in diagBinMethods:
+            yield bu.blankBinFilterFile, baseBinMethod
+        for rangeName in bu.allVerticalRangeNames:
+            suffixed = bu.suffixedBinMethodName(baseBinMethod, rangeName)
+            if suffixed in diagBinMethods:
+                yield rangeName, suffixed
 
     def innerloopsWrapper(self,
-        diagnosticGroup, diagnosticConfigs, fullBinVar, binMethod, selectedStatistics, options):
+        diagnosticGroup, diagnosticConfigs, fullBinVar, binMethod, selectedStatistics, options,
+        filterName):
 
         binVar = vu.varDictAll.get(fullBinVar, [None, fullBinVar])[1]
 
@@ -152,6 +176,9 @@ class CategoryBinMethodBase(AnalysisBase):
         myLoc['diagName'] = list(diagnosticConfigs.keys())
         for key in mydfwDict.keys():
             mydfwDict[key] = sdb.DFWrapper.fromLoc(mydfwDict[key], myLoc)
+
+        # not a database query field; only used downstream (e.g. filenames/titles) via myLoc
+        myLoc['binFilterName'] = filterName
 
         binValsMap = categoryBinValsAttributes(
             mydfwDict['dfw'], fullBinVar, binMethod, options)

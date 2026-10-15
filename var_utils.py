@@ -297,12 +297,6 @@ varDictModel = {
   modVarPrs: ['Pa', 'P'],
   'q2': ['g/kg', 'Q2m'],
   'qv': ['g/kg', 'Qv'],
-  'qv01to30': ['g/kg', 'Qv01to30'],
-  'qv01to10': ['g/kg', 'Qv01to10'],
-  'qv11to20': ['g/kg', 'Qv11to20'],
-  'qv21to30': ['g/kg', 'Qv21to30'],
-  'qv31to40': ['g/kg', 'Qv31to40'],
-  'qv41to55': ['g/kg', 'Qv41to55'],
   'rho': [kgm3, 'rho'],
   'surface_pressure': ['Pa', 'Ps'],
   't2m': ['C', 'T2m'],
@@ -361,17 +355,7 @@ modDiagnosticVarNames = [
   'diagnostic_w',
 ]
 
-modVarNames3d = modVarNamesBase3d+[
-  #extra variables
-  'qv01to30',
-  'qv01to10',
-  'qv11to20',
-  'qv21to30',
-  'qv31to40',
-  'qv41to55',
-]
-
-modVarNames3d += modDiagnosticVarNames
+modVarNames3d = modVarNamesBase3d+modDiagnosticVarNames
 
 def modelVarAttributes(var):
     # return short name and units
