@@ -127,7 +127,8 @@ class CategoryBinMethodBase(AnalysisBase):
 
                     if useWorkers:
                         workers.apply_async(self.innerloopsWrapper,
-                            args = (diagnosticGroup, diagnosticConfigs, fullBinVar, binMethod, selectedStatistics, options, filterName))
+                            args = (diagnosticGroup, diagnosticConfigs, fullBinVar, binMethod, selectedStatistics, options, filterName),
+                            error_callback = self.logWorkerError)
                     else:
                         self.innerloopsWrapper(
                             diagnosticGroup, diagnosticConfigs, fullBinVar, binMethod, selectedStatistics, options, filterName)

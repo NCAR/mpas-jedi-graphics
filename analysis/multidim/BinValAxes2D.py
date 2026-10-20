@@ -268,8 +268,13 @@ class BinValAxes2D(MultiDimBinMethodBase):
                 binCoordsLevels = list(np.asarray(binCoordsLevels)[~remove])
                 binCoords = list(np.asarray(binCoords, dtype=object)[~remove])
                 binCoords = [tuple(c) for c in binCoords]
-        if len(binCoords) == 0:
-            self.logger.warning(myLoc['binVar']+': all binVals removed by verticalBinFilters; skipping')
+        # pcolormesh edges are computed from neighboring bins, so each axis needs at least 2
+        nX = len({c[0] for c in binCoords})
+        nY = len({c[1] for c in binCoords})
+        if nX < 2 or nY < 2:
+            self.logger.warning(myLoc['binVar']+filterSuffix+', '+statName+': '+str(nX)+' x '+
+                                str(nY)+' bins remain after verticalBinFilters; need at least 2 '
+                                'per axis; skipping')
             return
 
         # unzip binCoords into independent X tuple and Y tuple

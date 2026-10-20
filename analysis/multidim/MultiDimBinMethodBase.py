@@ -130,7 +130,8 @@ class MultiDimBinMethodBase(AnalysisBase):
 
                         if useWorkers:
                             workers.apply_async(self.innerloopsWrapper,
-                                args = (diagnosticGroup, diagnosticConfigs, binVar, binMethod, selectedStatistics, options, filterName, binFilter))
+                                args = (diagnosticGroup, diagnosticConfigs, binVar, binMethod, selectedStatistics, options, filterName, binFilter),
+                                error_callback = self.logWorkerError)
                         else:
                             self.innerloopsWrapper(
                                 diagnosticGroup, diagnosticConfigs, binVar, binMethod, selectedStatistics, options, filterName, binFilter)
@@ -250,7 +251,11 @@ class MultiDimBinMethodBase(AnalysisBase):
             'binLabel': binLabel,
             'binConfig': binConfig,
         }
-        if len(binStrVals) < 2: return
+        if len(binStrVals) < 2:
+            if binFilter:
+                self.logger.warning(binVar+'_'+str(filterName)+': '+str(len(binStrVals))+
+                                    ' bins remain after verticalBinFilters; need at least 2; skipping')
+            return
 
         # only analyze variables that have non-zero Count when sliced by myLoc
         nVarsLoc = 0
