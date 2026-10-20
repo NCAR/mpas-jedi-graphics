@@ -1392,6 +1392,10 @@ binLims2D[(vu.obsVarAlt, bu.noBinMethod)]['format'] = '{:.0f}'
 
 binLims2D[(vu.obsVarImpact, bu.noBinMethod)] = deepcopy(binLims2D[(vu.obsVarAlt, bu.noBinMethod)])
 
+# 5-level bins with edges at 0.5, 5.5, ..., 55.5, aligned with binning_utils.py's
+# verticalBinFilters[vu.modVarLev] ranges; assumes a 55-level mesh (DiagnoseModelStatistics.py
+# warns otherwise). Level 56 of nVertLevelsP1 variables (W at the model top) falls outside the
+# bins; that's harmless because w = 0 at the rigid-lid top.
 binLims2D[(vu.modVarLev, bu.noBinMethod)] = {}
 binLims2D[(vu.modVarLev, bu.noBinMethod)]['start']  = 3
 binLims2D[(vu.modVarLev, bu.noBinMethod)]['stop']   = 53

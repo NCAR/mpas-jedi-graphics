@@ -139,6 +139,23 @@ class DiagnoseModelStatistics():
     nCells = pressure.shape[0]
     nVertLevels = pressure.shape[1]
     nVertLevelsP1 = nVertLevels+1
+
+    # ModelLatLev2D's model-level bins (predefined_configs.py's binLims2D) are fixed, not derived
+    # from the mesh. Warn when they don't match it: levels outside the bins are left out of those
+    # 2D statistics, and bins above the top level stay empty. The extra nVertLevelsP1 top interface
+    # (e.g. W at the model top) falls outside the bins and is not warned about; that's harmless
+    # because w = 0 at the rigid-lid top.
+    levAxes = pconf.binAxes2D.get((pconf.ModelLatLev2D, bu.noBinMethod))
+    if levAxes is not None:
+      levStarts = np.asarray(levAxes.starts(vu.modVarLev), dtype=float)
+      levStops = np.asarray(levAxes.stops(vu.modVarLev), dtype=float)
+      if levStarts.min() > 1 or levStops.max() <= nVertLevels:
+        self.logger.warning(pconf.ModelLatLev2D+' model-level bins span ['+str(levStarts.min())+
+          ', '+str(levStops.max())+'), which does not cover levels 1 to '+str(nVertLevels)+
+          '; levels outside it are left out of '+pconf.ModelLatLev2D+' statistics')
+      if levStarts.max() > nVertLevels:
+        self.logger.warning(pconf.ModelLatLev2D+' has model-level bins above level '+
+          str(nVertLevels)+'; they will be empty for '+str(nVertLevels)+'-level variables')
     nDiagLevs = len(mu.diagnosticPressures)
 
     dbVals = {}
