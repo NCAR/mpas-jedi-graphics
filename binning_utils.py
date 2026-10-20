@@ -57,6 +57,8 @@ blankBinFilterFile = 'full'
 #   + both minvalue and maxvalue -> that range
 #   + minvalue == maxvalue       -> a single level
 #   + only one of the two        -> clip only that end, leaving the other open
+# Both ends are inclusive by default. Set 'maxExclusive': True to exclude values equal to
+# maxvalue, i.e. [minvalue, maxvalue).
 #
 # Every vertical binVar also always gets the unrestricted 'full' range (blankBinFilterFile), which
 # is added by verticalRanges() below and is not listed here. 'full' never adds a suffix to output
@@ -86,17 +88,19 @@ verticalBinFilters = {
   # (see config.py's gnssro binVarConfigs) -- this generic mechanism now produces the equivalent
   # '<binMethod>_jet' suffixed output for whatever plain binMethod is registered there instead.
   vu.obsVarAlt:     {
-      'jet':  {'minvalue': alt_jet_min, 'maxvalue': alt_jet_max},
+      'jet':  {'minvalue': alt_jet_min, 'maxvalue': alt_jet_max, 'maxExclusive': True},
   },
   vu.obsVarImpact:  {
-      'jet':  {'minvalue': alt_jet_min, 'maxvalue': alt_jet_max},
+      'jet':  {'minvalue': alt_jet_min, 'maxvalue': alt_jet_max, 'maxExclusive': True},
   },
   # vu.obsVarPrs units are hPa. 'jet' reproduces the jet-stream pressure band formerly hardcoded
   # into the now-removed PjetMethod binMethod entry under vu.obsVarLat (see config.py's
   # profilePressureBinVars) -- see comment above.
   vu.obsVarPrs:     {
-      'jet':  {'minvalue': P_jet_min, 'maxvalue': P_jet_max},
+      'jet':  {'minvalue': P_jet_min, 'maxvalue': P_jet_max, 'maxExclusive': True},
   },
+  # The 'jet' ranges above exclude their upper edge, [min, max), matching the lessBound/
+  # greatEqualBound filters of the binMethods they replace, so jet counts are unchanged.
   # vu.modVarLev is a dimensionless model-level index; these ranges reproduce (generically) what
   # was previously only available for qv via modelsp_utils.py's aggregatedVariableConfig
   vu.modVarLev:     {
@@ -146,7 +150,8 @@ verticalBinFilterVariables = {
 def maskByRange(numVals, namedRange):
   '''
   Given an array-like of numeric values and a namedRange dict with optional 'minvalue'/'maxvalue'
-  keys (see verticalBinFilters above), return a boolean mask that is True where the value is
+  keys and an optional 'maxExclusive' flag (see verticalBinFilters above), return a boolean mask
+  that is True where the value is
   OUTSIDE the range (i.e. should be removed/excluded; keep numVals[~mask]). Shared by the
   plot-time trim (MultiDimBinMethodBase.maskByBinFilter/BinValAxes2D) and the collection-time
   aggregate mechanism (DiagnoseModelStatistics.py).
@@ -160,7 +165,10 @@ def maskByRange(numVals, namedRange):
     remove[lessBound(numVals, minvalue)] = True
   maxvalue = namedRange.get('maxvalue', None)
   if maxvalue is not None:
-    remove[greatBound(numVals, maxvalue)] = True
+    if namedRange.get('maxExclusive', False):
+      remove[greatEqualBound(numVals, maxvalue)] = True
+    else:
+      remove[greatBound(numVals, maxvalue)] = True
   return remove
 
 def verticalRangeVariants(diagValues, coordVals, levelRanges, varName, binVarKey, axis=None):
