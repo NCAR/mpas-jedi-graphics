@@ -318,7 +318,14 @@ class DiagnoseObsStatistics:
       levelResolvedBinVarKeys.add(obsVarKey)
       variants = bu.verticalRangeVariants(diagValues, metaVals, levelRanges, varName, obsVarKey)
       for rangeName, values in variants.items():
-        maskedDiagnostics.setdefault(rangeName, values)
+        # range names are not unique across vertical binVars (e.g., each has a 'jet'), so if this
+        # ObsSpace is binned by more than one of them, keep the first and say so
+        if rangeName in maskedDiagnostics:
+          if rangeName != bu.blankBinFilterFile:
+            logger.warning(varName+': '+obsVarKey+" range '"+rangeName+"' has the same name as "
+              "one from another vertical binVar; keeping the first, skipping this one")
+          continue
+        maskedDiagnostics[rangeName] = values
 
     # 2D binVars with one of those vertical binVars as an axis (e.g. LatPrs2D) are level-resolved
     # too, so they also skip the collection-time ranges
