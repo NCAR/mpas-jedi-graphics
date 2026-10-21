@@ -42,7 +42,6 @@ alt_jet_min = 9500.0
 alt_jet_max = 10500.0
 alt_jet_val = '{:.0f}'.format(0.5 * (alt_jet_min + alt_jet_max))
 altjetMethod = 'alt='+alt_jet_val+'m'
-impactjetMethod = 'alt='+alt_jet_val+'m'
 
 #===========================
 # named vertical-level ranges
