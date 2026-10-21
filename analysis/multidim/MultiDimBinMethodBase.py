@@ -182,6 +182,26 @@ class MultiDimBinMethodBase(AnalysisBase):
         for key in mydfwDict.keys():
             mydfwDict[key] = sdb.DFWrapper.fromLoc(mydfwDict[key], myLoc)
 
+        # Experiments are compared bin by bin, so their bins should be defined the same way. This
+        # guards against a mismatch by verifying that their bin centers (binVals) are the same. It
+        # catches differences like the ModelLatLev2D change from start=1, stop=56, nsteps=10 to
+        # start=3, stop=53, step=5.
+        # Missing data does not trigger the guard: every bin is written to the stats file, even
+        # when it's empty (with Count 0), so experiments with the same bin definitions always list
+        # the same binVals. Experiments with no rows here at all are left out of the comparison.
+        # There is still the chance that the bin centers are the same but the ranges are
+        # different, like the change to the 'jet' upper edge. This guard doesn't catch that.
+        binValsByExp = {expName: frozenset(mydfwDict['dfw'].levels('binVal', {'expName': expName}))
+                        for expName in self.expNames}
+        binValsByExp = {e: v for e, v in binValsByExp.items() if v}
+        if len(set(binValsByExp.values())) > 1:
+            shared = frozenset.intersection(*binValsByExp.values())
+            self.logger.warning(binVar+', '+str(binMethod)+': experiments have different bins ('+
+                ', '.join(str(e)+': '+str(len(v)) for e, v in binValsByExp.items())+
+                ', only '+str(len(shared))+' shared); their stats were collected with different '
+                'bin definitions; re-collect them with the same configuration; skipping')
+            return
+
         # not a database query field; only used downstream (e.g. filenames/titles) via myLoc
         myLoc['binFilterName'] = filterName
 
