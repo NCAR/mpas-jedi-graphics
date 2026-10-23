@@ -1190,7 +1190,8 @@ class BinningAxis:
     #   interpolated/extrapolated
     # Either (starts and stops) or values MUST be provided
     # step - delta between bin central values (overrides nsteps)
-    # nsteps - number of bins, can be used instead of step
+    # nsteps - number of intervals between the start and stop central values, can be used
+    #   instead of step; gives nsteps+1 bins (e.g., start=1, stop=56, nsteps=10 -> 11 bins).
     # f - format string for storing and plotting values
     # period - period of repetition for bins, starting at 0.
     # transforms - two transformation functions for nonlinear stepping intervals
