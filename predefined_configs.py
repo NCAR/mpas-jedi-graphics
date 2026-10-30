@@ -1078,20 +1078,20 @@ identityRangeBinVars = {
     vu.obsVarPrs: [vu.prsMeta, bu.BinMethod.commonDiags],
     vu.obsVarSenZen: [vu.senzenMeta, []],
 }
-for binVar, rangeVar in identityRangeBinVars.items():
+for binVar, (filterVar, exclusiveDiags) in identityRangeBinVars.items():
     if binVar not in binVarConfigs: binVarConfigs[binVar] = {}
     binVarConfigs[binVar][bu.identityBinMethod] = {
         'filters': [
             {'where': bu.lessBound,
-             'variable': rangeVar[0],
+             'variable': filterVar,
              'bounds': binAxes1D[binVar].starts()},
             {'where': bu.greatEqualBound,
-             'variable': rangeVar[0],
+             'variable': filterVar,
              'bounds': binAxes1D[binVar].stops()},
             AnyBadQC,
         ],
         'values': binAxes1D[binVar].values(),
-        'override_exclusiveDiags': rangeVar[1],
+        'override_exclusiveDiags': exclusiveDiags,
     }
 
 
@@ -1206,9 +1206,8 @@ obsLatBinVars = {
     vu.obsVarImpact: [vu.impactMeta, [], namedPolarLatBands],
     vu.obsVarPrs: [vu.prsMeta, [], namedLatBands],
 }
-for binVar, rangeVar in obsLatBinVars.items():
+for binVar, (filterVar, exclusiveDiags, latBands) in obsLatBinVars.items():
     if binVar not in binVarConfigs: binVarConfigs[binVar] = {}
-    latBands = deepcopy(rangeVar[2])
     for latBand, latStart, latStop in zip(
         latBands['values'],
         latBands['starts'],
@@ -1217,10 +1216,10 @@ for binVar, rangeVar in obsLatBinVars.items():
         binVarConfigs[binVar][latBand] = {
             'filters': [
                 {'where': bu.lessBound,
-                 'variable': rangeVar[0],
+                 'variable': filterVar,
                  'bounds': binAxes1D[binVar].starts()},
                 {'where': bu.greatEqualBound,
-                 'variable': rangeVar[0],
+                 'variable': filterVar,
                  'bounds': binAxes1D[binVar].stops()},
                 {'where': bu.lessBound,
                  'variable': vu.latMeta,
@@ -1231,7 +1230,7 @@ for binVar, rangeVar in obsLatBinVars.items():
                 AnyBadQC,
             ],
             'values': binAxes1D[binVar].values(),
-            'override_exclusiveDiags': rangeVar[1],
+            'override_exclusiveDiags': exclusiveDiags,
         }
 
     # region-specific bins, named after each vu.obsRegionBinVar region (e.g. 'MELISSA2025'):
@@ -1243,14 +1242,14 @@ for binVar, rangeVar in obsLatBinVars.items():
         binVarConfigs[binVar][region] = {
             'filters': [
                 {'where': bu.lessBound,
-                 'variable': rangeVar[0],
+                 'variable': filterVar,
                  'bounds': binAxes1D[binVar].starts()},
                 {'where': bu.greatEqualBound,
-                 'variable': rangeVar[0],
+                 'variable': filterVar,
                  'bounds': binAxes1D[binVar].stops()},
             ]+regionFilters,
             'values': binAxes1D[binVar].values(),
-            'override_exclusiveDiags': rangeVar[1],
+            'override_exclusiveDiags': exclusiveDiags,
         }
 
 # Add named latitude-band-specific bins for model-space ranged variables
@@ -1258,9 +1257,8 @@ modelLatBinVars = {
     vu.modVarLev: [vu.levModel, int, namedTropLatBands, vu.modVarNamesBase3d],
     vu.modVarDiagPrs: [vu.prsModelDiag, float, namedLatBands, vu.modDiagnosticVarNames],
 }
-for binVar, rangeVar in modelLatBinVars.items():
+for binVar, (filterVar, centralsType, latBands, includeVars) in modelLatBinVars.items():
     if binVar not in binVarConfigs: binVarConfigs[binVar] = {}
-    latBands = deepcopy(rangeVar[2])
     for latBand, latStart, latStop in zip(
         latBands['values'],
         latBands['starts'],
@@ -1269,8 +1267,8 @@ for binVar, rangeVar in modelLatBinVars.items():
         binVarConfigs[binVar][latBand] = {
             'filters': [
                 {'where': bu.notEqualBound,
-                 'variable': rangeVar[0],
-                 'bounds': binAxes1D[binVar].centrals(astype=rangeVar[1])},
+                 'variable': filterVar,
+                 'bounds': binAxes1D[binVar].centrals(astype=centralsType)},
                 {'where': bu.lessBound,
                  'variable': vu.latModel,
                  'bounds': latStart},
@@ -1279,7 +1277,7 @@ for binVar, rangeVar in modelLatBinVars.items():
                  'bounds': latStop},
             ],
             'values': binAxes1D[binVar].values(),
-            'include variables': rangeVar[3]
+            'include variables': includeVars
         }
 
     # region-specific bins, named after each vu.modelRegionBinVar region (e.g. 'MELISSA2025'):
@@ -1291,11 +1289,11 @@ for binVar, rangeVar in modelLatBinVars.items():
         binVarConfigs[binVar][region] = {
             'filters': [
                 {'where': bu.notEqualBound,
-                 'variable': rangeVar[0],
-                 'bounds': binAxes1D[binVar].centrals(astype=rangeVar[1])},
+                 'variable': filterVar,
+                 'bounds': binAxes1D[binVar].centrals(astype=centralsType)},
             ]+regionFilters,
             'values': binAxes1D[binVar].values(),
-            'include variables': rangeVar[3]
+            'include variables': includeVars
         }
 
 # pressure level bins by satellite ObsType and namedLatBand
@@ -1343,7 +1341,7 @@ cldfracBinVars = {
 #    vu.obsVarLT: [bu.LocalHour],
 #    vu.obsVarSenZen: [vu.senzenMeta],
 }
-for binVar, rangeVar in cldfracBinVars.items():
+for binVar, [filterVar] in cldfracBinVars.items():
     if binVar not in binVarConfigs: binVarConfigs[binVar] = {}
     for cldBand, cldStart, cldStop in zip(
         namedCldFracBands['values'],
@@ -1353,10 +1351,10 @@ for binVar, rangeVar in cldfracBinVars.items():
         binVarConfigs[binVar][cldBand] = {
             'filters': [
                 {'where': bu.lessBound,
-                 'variable': rangeVar[0],
+                 'variable': filterVar,
                  'bounds': binAxes1D[binVar].starts()},
                 {'where': bu.greatEqualBound,
-                 'variable': rangeVar[0],
+                 'variable': filterVar,
                  'bounds': binAxes1D[binVar].stops()},
                 {'where': bu.lessBound,
                  'variable': vu.cldfracMeta,
@@ -1374,7 +1372,7 @@ for binVar, rangeVar in cldfracBinVars.items():
 landfracBinVars = {
     vu.obsVarCI: [bu.SCIOkamoto],
 }
-for binVar, rangeVar in landfracBinVars.items():
+for binVar, [filterVar] in landfracBinVars.items():
     if binVar not in binVarConfigs: binVarConfigs[binVar] = {}
     for landBand, landStart, landStop in zip(
         namedLandFracBands['values'],
@@ -1384,10 +1382,10 @@ for binVar, rangeVar in landfracBinVars.items():
         binVarConfigs[binVar][landBand] = {
             'filters': [
                 {'where': bu.lessBound,
-                 'variable': rangeVar[0],
+                 'variable': filterVar,
                  'bounds': binAxes1D[binVar].starts()},
                 {'where': bu.greatEqualBound,
-                 'variable': rangeVar[0],
+                 'variable': filterVar,
                  'bounds': binAxes1D[binVar].stops()},
                 {'where': bu.lessBound,
                  'variable': vu.landfracGeo,
