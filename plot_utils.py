@@ -183,7 +183,8 @@ def timeDeltaTickLabels(x, pos):
     # default to 0 days when empty
     if out == '': out = '0d'
 
-    return out
+    # the day suffix leaves a trailing space when no hours follow (e.g. '1d ')
+    return out.strip()
 
 #DTimeLocator = AutoDateLocator(interval_multiples=True)
 DTimeLocator = AutoDateLocator()

@@ -482,6 +482,13 @@ axisTransforms['CloudImpact'] = {
     'locator': mticker.FixedLocator,
 }
 
+# ModelLevel: no rescaling; FixedLocator places ticks at bin centers
+axisTransforms['ModelLevel'] = {
+    'forward': lambda x: x,
+    'inverse': lambda y: y,
+    'locator': mticker.FixedLocator,
+}
+
 class axisTransform:
     '''
     Accessor class for axisTransforms dictionary of axis transformation and locator functions

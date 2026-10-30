@@ -537,7 +537,15 @@ class AnalysisBase():
             self.analyze_(workers)
         else:
             # divide workers acros analyses without internal parallelism/blocking
-            workers.apply_async(self.analyze_)
+            workers.apply_async(self.analyze_, error_callback = self.logWorkerError)
+
+    def logWorkerError(self, err):
+        '''
+        error_callback for workers.apply_async: without it, an exception raised in a worker
+        is silently discarded and its figures are missing with no indication why
+        '''
+        # multiprocessing attaches the worker's formatted traceback as err.__cause__
+        self.logger.error('worker raised '+repr(err)+'\n'+str(err.__cause__ or ''))
 
     def analyze_(self, workers = None):
         '''

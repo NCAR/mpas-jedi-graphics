@@ -442,12 +442,6 @@ variableSpecificDiagnosticConfigs = {
   vu.modVarPrs: [f'mm{REF_KEY}an', f'log_mo{REF_KEY}an'],
   'q2':         [f'mm{REF_KEY}an', f'log_mo{REF_KEY}an'],
   'qv':         [f'mm{REF_KEY}an', f'log_mo{REF_KEY}an'],
-  'qv01to30':   [f'mm{REF_KEY}an', f'log_mo{REF_KEY}an'],
-  'qv01to10':   [f'mm{REF_KEY}an', f'log_mo{REF_KEY}an'],
-  'qv11to20':   [f'mm{REF_KEY}an', f'log_mo{REF_KEY}an'],
-  'qv21to30':   [f'mm{REF_KEY}an', f'log_mo{REF_KEY}an'],
-  'qv31to40':   [f'mm{REF_KEY}an', f'log_mo{REF_KEY}an'],
-  'qv41to55':   [f'mm{REF_KEY}an', f'log_mo{REF_KEY}an'],
 }
 
 def variableSpecificDiagnostics(varName: str, nEns: int):
@@ -456,53 +450,6 @@ def variableSpecificDiagnostics(varName: str, nEns: int):
   if nEns > 1:
     diags += ['sigmaxb', 'sigmaxa', 'sigmaxinf']
   return diags
-
-aggregatedVariableConfig = {
-  'qv01to30': {
-    'model variable': 'qv',
-    'max level': 30,
-  },
-  'qv01to10': {
-    'model variable': 'qv',
-    'min level': 1,
-    'max level': 10,
-  },
-  'qv11to20': {
-    'model variable': 'qv',
-    'min level': 11,
-    'max level': 20,
-  },
-  'qv21to30': {
-    'model variable': 'qv',
-    'min level': 21,
-    'max level': 30,
-  },
-  'qv31to40': {
-    'model variable': 'qv',
-    'min level': 31,
-    'max level': 40,
-  },
-  'qv41to55': {
-    'model variable': 'qv',
-    'min level': 41,
-    'max level': 55,
-  },
-}
-
-def aggVariableConfig(varName: str):
-  return aggregatedVariableConfig.get(
-    varName,
-    {'model variable': varName}
-  )
-
-def aggModelVariable(varName: str):
-  return aggVariableConfig(varName)['model variable']
-
-def aggMinLevel(varName: str):
-  return np.max([aggVariableConfig(varName).get('min level', 1), 1])
-
-def aggMaxLevel(varName: str, nLevels: int):
-  return np.min([aggVariableConfig(varName).get('max level', nLevels), nLevels])
 
 # ------------------------------------------------------------
 def main():

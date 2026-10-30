@@ -139,6 +139,23 @@ class DiagnoseModelStatistics():
     nCells = pressure.shape[0]
     nVertLevels = pressure.shape[1]
     nVertLevelsP1 = nVertLevels+1
+
+    # ModelLatLev2D's model-level bins (predefined_configs.py's binLims2D) are fixed, not derived
+    # from the mesh. Warn when they don't match it: levels outside the bins are left out of those
+    # 2D statistics, and bins above the top level stay empty. The extra nVertLevelsP1 top interface
+    # (e.g. W at the model top) falls outside the bins and is not warned about; that's harmless
+    # because w = 0 at the rigid-lid top.
+    levAxes = pconf.binAxes2D.get((pconf.ModelLatLev2D, bu.noBinMethod))
+    if levAxes is not None:
+      levStarts = np.asarray(levAxes.starts(vu.modVarLev), dtype=float)
+      levStops = np.asarray(levAxes.stops(vu.modVarLev), dtype=float)
+      if levStarts.min() > 1 or levStops.max() <= nVertLevels:
+        self.logger.warning(pconf.ModelLatLev2D+' model-level bins span ['+str(levStarts.min())+
+          ', '+str(levStops.max())+'), which does not cover levels 1 to '+str(nVertLevels)+
+          '; levels outside it are left out of '+pconf.ModelLatLev2D+' statistics')
+      if levStarts.max() > nVertLevels:
+        self.logger.warning(pconf.ModelLatLev2D+' has model-level bins above level '+
+          str(nVertLevels)+'; they will be empty for '+str(nVertLevels)+'-level variables')
     nDiagLevs = len(mu.diagnosticPressures)
 
     dbVals = {}
@@ -241,10 +258,8 @@ class DiagnoseModelStatistics():
       for diagName in mu.variableSpecificDiagnostics(varName, len(dataSets['bgEns'])):
         # TODO(JJG): extend to ACC diagnostic, e.g., for 500mb geopotential height
 
-        modelVarName = mu.aggModelVariable(varName)
-
         diagFunction = mu.diagnosticFunctions[diagName]
-        diagnostic = diagFunction.evaluate(modelVarName, dataSets, self.nprocs)
+        diagnostic = diagFunction.evaluate(varName, dataSets, self.nprocs)
 
         self.logger.info('diagnostic calculated: '+diagName)
 
@@ -257,50 +272,64 @@ class DiagnoseModelStatistics():
           nn = dShape[1]
         dbValsNN = dbVals[(nn,)]
 
-        # TODO: move this binning to a generic binMethod instead of creating
-        #       unique level-binned variables for, e.g., qv
-
-        if len(dShape)==2 and varName not in vu.modDiagnosticVarNames:
-          minLevel = mu.aggMinLevel(varName)
-          maxLevel = mu.aggMaxLevel(varName, nn)
-
-          # mask levels < minLevel
-          mask = bu.lessBound(dbValsNN[vu.modVarLev], minLevel)
-          diagnostic[:,mask] = np.nan
-
-          # mask levels > maxLevel
-          mask = bu.greatBound(dbValsNN[vu.modVarLev], maxLevel)
-          diagnostic[:,mask] = np.nan
-
         if np.isfinite(diagnostic).sum() == 0:
           self.logger.warning('All missing values for (varName, diagnostic): '+varName+', '+diagName)
           continue
+
+        # Named vertical-level ranges (binning_utils.py's verticalBinFilters, scoped by
+        # verticalBinFilterVariables) let a level-resolved 2D diagnostic be aggregated over a
+        # sub-range of levels into a single bin, in addition to its normal 'full' (all-levels)
+        # treatment. This only makes sense for binVarKeys that don't already resolve individual
+        # levels themselves (vu.modVarLev/vu.modVarDiagPrs already produce one bin per level, so
+        # restricting their range is redundant with the plot-time trim in
+        # MultiDimBinMethodBase/BinValAxes2D), and only for variables actually indexed by model
+        # level (vu.modDiagnosticVarNames are indexed by diagnostic-pressure level instead, so
+        # model-level bounds would not mean what they say for those). 2D binVars with one of those
+        # as an axis (e.g. ModelLatLev2D) are level-resolved too.
+        levelResolvedBinVarKeys = {vu.modVarLev, vu.modVarDiagPrs}
+        levelResolvedBinVarKeys |= {
+          name for name, axes in pconf.binVars2D.items()
+          if set(axes) & levelResolvedBinVarKeys}
+        isModelLevelIndexed = nDims == 2 and varName not in vu.modDiagnosticVarNames
+
+        if isModelLevelIndexed:
+          levelRanges = bu.verticalRanges(vu.modVarLev)
+          maskedDiagnostics = bu.verticalRangeVariants(
+            diagnostic, dbValsNN[vu.modVarLev], levelRanges, varName, vu.modVarLev, axis=1)
+        else:
+          maskedDiagnostics = {bu.blankBinFilterFile: diagnostic}
 
         # parallelize across binMethods
         for (binVarKey, binMethodName), binMethod in binMethods.items():
           if binMethod.excludeDiag(diagName): continue
           if binMethod.excludeVariable(varName): continue
 
-          if workers is None:
-            subStats.append(self._processBinMethod(
-              dbValsNN,
-              DiagSpaceGrp,
-              varName,
-              diagName,
-              binVarKey, binMethodName, binMethod,
-              diagnostic,
-            ))
-          else:
-            subStats.append(workers.apply_async(self._processBinMethod,
-              args=(
+          applicableRanges = bu.applicableFilterRanges(binVarKey, levelResolvedBinVarKeys, maskedDiagnostics)
+
+          for rangeName in applicableRanges:
+            outputBinMethodName = bu.suffixedBinMethodName(binMethodName, rangeName)
+            diagValues = maskedDiagnostics[rangeName]
+
+            if workers is None:
+              subStats.append(self._processBinMethod(
                 dbValsNN,
                 DiagSpaceGrp,
                 varName,
                 diagName,
-                binVarKey, binMethodName, binMethod,
-                diagnostic,
-              )
-            ))
+                binVarKey, outputBinMethodName, binMethod,
+                diagValues,
+              ))
+            else:
+              subStats.append(workers.apply_async(self._processBinMethod,
+                args=(
+                  dbValsNN,
+                  DiagSpaceGrp,
+                  varName,
+                  diagName,
+                  binVarKey, outputBinMethodName, binMethod,
+                  diagValues,
+                )
+              ))
 
     if workers is None:
       for stats in subStats:
