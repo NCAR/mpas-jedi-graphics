@@ -525,6 +525,9 @@ def _obs_to_model_region_config(obs_region_config):
       model_filters.append(model_filter)
 
     method_config['filters'] = model_filters
+    # skip the diagnostic-pressure fields, as the other model binMethods do; they reuse
+    # model-level varNames (T, U, V, W) and would land in the same ModelRegion rows
+    method_config['exclude variables'] = vu.modDiagnosticVarNames
 
   return model_region_config
 
