@@ -309,7 +309,7 @@ varDictModel = {
   'v10': ['m/s', 'V10m'],
   'w': ['m/s', 'W'],
   # diagnostic variables at fixed pressure levels
-  modVarDiagPrs: ['Pa', 'DiagnosticP'],
+  modVarDiagPrs: ['hPa', 'DiagnosticP'],
   'diagnostic_relhum': ['%', 'RH'],
   'diagnostic_dewpoint': ['K', 'Tdp'],
   'diagnostic_temperature': ['K', 'T'],
