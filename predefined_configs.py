@@ -972,7 +972,7 @@ binVarConfigs = {
             'filters': [
                 {'where': bu.notEqualBound,
                  'variable': vu.prsModelDiag,
-                 'bounds': binAxes1D[vu.modVarDiagPrs].centrals},
+                 'bounds': binAxes1D[vu.modVarDiagPrs].centrals(astype=float)},
             ],
             'include variables': vu.modDiagnosticVarNames,
             'values': binAxes1D[vu.modVarDiagPrs].values(),
