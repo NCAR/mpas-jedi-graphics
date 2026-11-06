@@ -67,6 +67,9 @@ profilePressureBinVars[vu.obsVarLat] += [bu.latbandsMethod]
 for latBand in pconf.namedLatBands['values']:
     profilePressureBinVars[vu.obsVarPrs] += [latBand]
 
+# pseudo-2D pressure bins restricted to each selected region (see obsBinVars[vu.obsRegionBinVar])
+profilePressureBinVars[vu.obsVarPrs] += obsBinVars.get(vu.obsRegionBinVar, [])
+
 # 2D latitude-pressure bins
 # priority 1b
 profilePressureBinVars[pconf.LatPrs2D] += [bu.noBinMethod]
@@ -109,6 +112,10 @@ gnssrobndBinVars[vu.obsVarImpact] += [bu.identityBinMethod, bu.altjetMethod]
 for latBand in pconf.namedPolarLatBands['values']:
     gnssrorefBinVars[vu.obsVarAlt] += [latBand]
     gnssrobndBinVars[vu.obsVarImpact] += [latBand]
+
+# pseudo-2D altitude bins restricted to each selected region (see obsBinVars[vu.obsRegionBinVar])
+gnssrorefBinVars[vu.obsVarAlt] += obsBinVars.get(vu.obsRegionBinVar, [])
+gnssrobndBinVars[vu.obsVarImpact] += obsBinVars.get(vu.obsRegionBinVar, [])
 
 ## priority 1b
 # 2D bins
@@ -283,10 +290,18 @@ modelBinVars[vu.modelRegionBinVar] = obsBinVars[vu.obsRegionBinVar].copy()
 for latBand in pconf.namedLatBands['values']:
   modelBinVars[vu.modVarDiagPrs] += [latBand]
 
+# pseudo-2D diagnostic pressure bins restricted to each selected region
+# (see modelBinVars[vu.modelRegionBinVar])
+modelBinVars[vu.modVarDiagPrs] += modelBinVars[vu.modelRegionBinVar]
+
 # pseudo-2D model level bins with named latitude-band methods
 # priority 1
 for latBand in pconf.namedTropLatBands['values']:
   modelBinVars[vu.modVarLev] += [latBand]
+
+# pseudo-2D model level bins restricted to each selected region
+# (see modelBinVars[vu.modelRegionBinVar])
+modelBinVars[vu.modVarLev] += modelBinVars[vu.modelRegionBinVar]
 
 # pseudo-2D model level bins with GEOIR lat-lon boxes
 # priority 2
