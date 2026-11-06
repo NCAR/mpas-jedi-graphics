@@ -413,7 +413,8 @@ binLims1D[vu.modVarLat]['format'] = '{:.0f}'
 
 binLims1D[vu.modVarLev] = {}
 binLims1D[vu.modVarLev]['start']  = 1
-binLims1D[vu.modVarLev]['stop']   = 55+1
+# one bin per level, up to the nVertLevelsP1 top interface (e.g. W at the model top)
+binLims1D[vu.modVarLev]['stop']   = mu.nlevelsP1
 binLims1D[vu.modVarLev]['step']   = 1
 binLims1D[vu.modVarLev]['format'] = '{:.0f}'
 
@@ -1428,13 +1429,14 @@ binLims2D[(vu.obsVarAlt, bu.noBinMethod)]['format'] = '{:.0f}'
 
 binLims2D[(vu.obsVarImpact, bu.noBinMethod)] = deepcopy(binLims2D[(vu.obsVarAlt, bu.noBinMethod)])
 
-# 5-level bins with edges at 0.5, 5.5, ..., 55.5, aligned with binning_utils.py's
-# verticalBinFilters[vu.modVarLev] ranges; assumes a 55-level mesh (DiagnoseModelStatistics.py
-# warns otherwise). Level 56 of nVertLevelsP1 variables (W at the model top) falls outside the
-# bins; that's harmless because w = 0 at the rigid-lid top.
+# 5-level bins with edges at 0.5, 5.5, ..., covering levels 1 to modelsp_utils.nlevels and
+# aligned with binning_utils.py's verticalBinFilters[vu.modVarLev] ranges (edges at 0.5, 5.5, ...,
+# 55.5 for 55 levels). When nlevels is a multiple of 5, the nVertLevelsP1 top interface (W at the
+# rigid-lid model top, where w = 0) falls outside the bins; otherwise it lands in the top bin and
+# adds those zeros to W's top-bin statistics.
 binLims2D[(vu.modVarLev, bu.noBinMethod)] = {}
 binLims2D[(vu.modVarLev, bu.noBinMethod)]['start']  = 3
-binLims2D[(vu.modVarLev, bu.noBinMethod)]['stop']   = 53
+binLims2D[(vu.modVarLev, bu.noBinMethod)]['stop']   = 3+5*((mu.nlevels-1)//5)
 binLims2D[(vu.modVarLev, bu.noBinMethod)]['step']   = 5
 binLims2D[(vu.modVarLev, bu.noBinMethod)]['format'] = '{:.0f}'
 

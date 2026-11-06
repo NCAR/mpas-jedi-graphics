@@ -6,6 +6,7 @@ from copy import deepcopy
 import inspect
 import itertools
 import logging
+import modelsp_utils as mu
 import numpy as np
 import os
 import plot_utils as pu
@@ -108,7 +109,8 @@ verticalBinFilters = {
       'L11to20' : {'minvalue': 11, 'maxvalue': 20},
       'L21to30' : {'minvalue': 21, 'maxvalue': 30},
       'L31to40' : {'minvalue': 31, 'maxvalue': 40},
-      'L41to55' : {'minvalue': 41, 'maxvalue': 55},
+      # the top range ends at the model top (modelsp_utils.nlevels)
+      'L41to{:02d}'.format(mu.nlevels) : {'minvalue': 41, 'maxvalue': mu.nlevels},
   },
 }
 
