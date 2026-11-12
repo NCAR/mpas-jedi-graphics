@@ -1,0 +1,110 @@
+Probabilistic verification of ensemble brightness temperature (Tb) forecasts
+============================================================================
+
+Verifies an ensemble of Tb forecasts in observation space against geostationary
+IR observations (e.g., ABI on GOES-16, AHI on Himawari-8), using the per-member
+obsout files written by the MPAS-Workflow forecast verification.
+
+Method
+------
+For each forecast initialization time, lead time, and threshold:
+  1. An event is Tb below (default; cold, cloudy) or above the threshold, defined
+     for the obs and for each member at every location.
+  2. The forecast probability is the fraction of members forecasting the event.
+  3. An Nx2 contingency table (forecast probability bin x observed yes/no) is written out.
+The tables are summed over initialization times, and from the aggregated tables:
+  - Reliability diagram: observed relative frequency vs. forecast probability (bin center),
+    with the sample count per bin in an inset.
+  - ROC curve and the area under it (AUC), using each probability bin edge as a decision threshold.
+  - Brier score (BS) and Brier skill score (BSS = 1 - BS/BS_clim), where
+    BS_clim = obar*(1-obar) and obar is the observed event frequency of the sample
+    (sample climatology, per lead time and threshold). For pct_<p>, obar = p/100; for val_<v>,
+    obar can change with lead time.
+  As in MET, BS and the reliability diagram use the center of each probability bin as the
+  forecast probability, computed from the Nx2 contingency table.
+
+Thresholds (-thres, comma-separated):
+  pct_<p>  p-th percentile, computed separately for the obs and for each member. The obs and
+           every member then have the same event frequency, so a systematic Tb bias does not
+           affect the scores. The physical value of each threshold is saved in the case tables.
+  val_<v>  fixed Tb in K.
+
+Probability bins (-nbins, default 20): bin 0 is [0, 1/nbins], bin i is (i/nbins, (i+1)/nbins].
+Bins are assigned from member counts, so there is no round-off at the bin edges. With fewer
+members than bins, some bins are empty; they are skipped in the plots.
+
+Locations where the obs or any member's hofx is missing are removed from that case. A case
+with a missing member file is skipped, and is not counted in the aggregation (nCases).
+
+Files
+-----
+probabilisticVerification.py  Driver: reads the members, writes the tables, makes the plots.
+probutils.py                  Thresholds, contingency tables, aggregation, and scores.
+plot.py                       Plotting functions (maps, histograms, reliability, ROC, lead time).
+qsub.sh                       Submits one PBS job per channel. Edit the VARIABLES SETUP section.
+utils.py                      Link to ../conditionalVerification/utils.py (dates, argument parsing, logging).
+plot_abi_L2_direct.py         Standalone: plots ABI L2 cloud products from NOAA CLASS at their
+                              original resolution. Expensive.
+
+Input
+-----
+Member files are found from a template (-tmpl), by default
+  {expDir}/Verification/fc/mem{mem:03d}/{init}/{fhr}hr/dbOut/obsout_{app}_{sensor}.h5
+where {expDir} is the experiment directory (-dir), {mem} the member number, {init} the
+initialization date (YYYYMMDDHH), {fhr} the lead time in hours, {app} is -app (default hofx),
+and {sensor} is -s (default abi_g16).
+The number of members is counted from the files unless -nmem is given. The channel (-ch) is
+the value of the Channel coordinate in the file, e.g. 13 for the ABI/AHI 10.4/10.3 um band.
+
+Usage
+-----
+module load conda && conda activate npl
+export PYTHONDONTWRITEBYTECODE=1   # avoid __pycache__/ in the repository
+
+python probabilisticVerification.py -dir <experiment dir> -s abi_g16 -ch 13 \
+    -di 2018041500 -de 2018051200 -dt 72 -fhr0 6 -fhr 48 -freq 6 \
+    -thres pct_5.0,pct_10.0,pct_20.0,val_235.0 [-maps true] [-hist true] [-cases true]
+
+Run with -h for all options. Useful ones:
+  -maps true      obs Tb, ensemble mean and spread, obs event, and forecast probability maps per case
+  -ens true       a map for every member (expensive)
+  -hist true      obs and ensemble hofx Tb histograms per case
+  -cases true     reliability and ROC plots per case
+  -ev below|above event is Tb below (default) or above the threshold
+  -plotOnly true  re-plot the scores from existing aggregated tables, without reading the members.
+                  -dir, -di, and -de are still required, and the lead times (-fhr0, -fhr, -freq)
+                  and thresholds (-thres) must match the original run to find the tables.
+  -ext lon0,lon1,lat0,lat1   map extent (default: global)
+  -np N           number of processes computing the tables and plots of each case
+                  (default: all available cpus)
+  -nread N        number of processes reading member files (default 16). Reading is I/O bound,
+                  so N can exceed the number of cpus. Reads overlap within and across cases.
+
+On Derecho/Casper, edit the VARIABLES SETUP section of qsub.sh and run ./qsub.sh from this
+directory (it finds probabilisticVerification.py in the current directory). For each channel,
+it creates an output folder <sensor>_ch<ch>_<dateIni>-<dateEnd>_<fhr>hr/ in this directory and
+submits the job from there.
+
+plot_abi_L2_direct.py (standalone):
+python plot_abi_L2_direct.py -obs <dir with data_from_noaa_class_<product>/> \
+    -latlon <dir with latlon_<resol>.nc> -di 2018041600 -de 2018041600 [-p CTPF,ACHAF] [-np N]
+
+Output (under -o, default the current directory)
+------
+tables/contingency_table_i<init>_f<hhh>_v<valid>_<thres>.yaml   per case, with the physical thresholds
+tables/contingency_table_aggregated_f<hhh>_<thres>.yaml         summed over initialization times
+scores/reliability_*.png, scores/roc_*.png
+    aggregated_<ch>_f<hhh>_<thres>      one lead time and threshold
+    aggregated_summary_<ch>_f<hhh>      all thresholds for one lead time
+    aggregated_summary_<ch>_<thres>     all lead times for one threshold
+    i<init>_f<hhh>_v<valid>_<thres>     one case (-cases true)
+scores/{BS,BSS,AUC}_aggregated_summary_<ch>.png   as a function of lead time, one line per threshold
+scores/scores_aggregated_summary_<ch>.yaml        the BS, BSS, and AUC values
+maps/                                             maps and histograms (-maps, -ens, -hist)
+
+log.verification (log file) is written to the current directory, not under -o.
+
+Contingency table format (YAML):
+  nBins, nMembers, nCases
+  obsYes, obsNo   count of locations per probability bin where the event was / was not observed
+  physicalThreshold: {obs, members}   (per case only)
