@@ -1,4 +1,3 @@
-import binning_utils as bu
 from copy import deepcopy
 import datetime as dt
 from datetime import datetime, timedelta
@@ -172,10 +171,13 @@ templateVariables = {
 #  '2D-c-s': 'smois',
 }
 
-#setting for 120km res.:
 nlevelSurface = 1
+# number of model levels (nVertLevels) in the MPAS mesh. The model-level bins
+# (predefined_configs.py's binLims1D/binLims2D) and the top named model-level range
+# (binning_utils.py's verticalBinFilters) are derived from it, and DiagnoseModelStatistics.py
+# stops if the mesh has a different number of levels.
 nlevels = 55
-nlevelsP1 =56
+nlevelsP1 = nlevels+1
 
 #
 fcRange = int(fcHours)/24.
@@ -405,6 +407,7 @@ class fieldRelativeDiff():
     exp = varRead(varName, fieldsDB['mean'], nprocs)
 
     d = np.empty_like(ref)
+    import binning_utils as bu
     valid = bu.greatBound(np.abs(ref), 0.)
     d[valid] = (exp[valid] - ref[valid]) / ref[valid]
 
@@ -421,6 +424,7 @@ class fieldLogRatio():
     exp = varRead(varName, fieldsDB['mean'], nprocs)
 
     d = np.empty_like(ref)
+    import binning_utils as bu
     valid = bu.greatBound(ref, 0.)
     valid = np.logical_and(bu.greatBound(exp, 0.), valid)
 
